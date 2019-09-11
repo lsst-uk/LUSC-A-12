@@ -1,0 +1,1357 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+
+\title{LUSC-A-12 LSST:UK phase-A technology experiments}
+\author{D. Morris}
+\date{September 2019}
+
+\setlength{\parskip}{1em}
+
+\usepackage{xspace}
+% Standard terms used throughout the document,
+% defined as macro commands to maintain consistency
+\newcommand{\json} {JSON\xspace}
+\newcommand{\yaml} {YAML\xspace}
+\newcommand{\avro} {Avro\xspace}
+\newcommand{\fits} {FITS\xspace}
+\newcommand{\png} {PNG\xspace}
+\newcommand{\jpeg} {JPEG\xspace}
+\newcommand{\parquet} {Parquet\xspace}
+\newcommand{\votable} {VOTable\xspace}
+\newcommand{\voevent} {VOEvent\xspace}
+
+\newcommand{\ansible} {Ansible\xspace}
+\newcommand{\docker} {Docker\xspace}
+\newcommand{\dockercompose} {docker-compose\xspace}
+
+\newcommand{\openstack} {OpenStack\xspace}
+\newcommand{\dnsmasq} {\texttt{dnsmasq}\xspace}
+
+\newcommand{\eleanor} {Eleanor\xspace}
+\newcommand{\ischnura} {Ischnura\xspace}
+\newcommand{\esperia} {Esperia\xspace}
+\newcommand{\enteucha} {Enteucha\xspace}
+
+\newcommand{\libvirt} {\texttt{libvirt}\xspace}
+\newcommand{\cloudinit} {\texttt{cloud-init}\xspace}
+\newcommand{\kickstart} {kickstart\xspace}
+\newcommand{\sysadmin} {system-admin\xspace}
+\newcommand{\stevedore} {\textit{Stevedore}\xspace}
+
+\newcommand{\btrfs} {\texttt{btrfs}\xspace}
+\newcommand{\filesystem} {files-ystem\xspace}
+
+\newcommand{\paas} {PaaS\xspace}
+
+\newcommand{\redhat} {RedHat\xspace}
+\newcommand{\fedora} {Fedora\xspace}
+
+\newcommand{\github} {GitHub\xspace}
+
+\newcommand{\kafka} {Kafka\xspace}
+\newcommand{\spark} {Spark\xspace}
+\newcommand{\cassandra} {Cassandra\xspace}
+\newcommand{\apachekafka} {Apache Kafka\xspace}
+\newcommand{\apachespark} {Apache Spark\xspace}
+
+\newcommand{\kubernetes} {Kubernetes\xspace}
+\newcommand{\virtualbox} {VirtualBox\xspace}
+\newcommand{\vagrant} {Vagrant\xspace}
+\newcommand{\kvm} {KVM\xspace}
+
+\newcommand{\mariadb} {MariaDB\xspace}
+\newcommand{\hsqldb} {HSQLDB\xspace}
+\newcommand{\cqengine} {CQEngine\xspace}
+
+\newcommand{\mirrormaker} {Mirror Maker\xspace}
+\newcommand{\schemaregistry} {Schema Registry\xspace}
+
+\newcommand{\phasea} {phase-A\xspace}
+\newcommand{\phaseb} {phase-B\xspace}
+\newcommand{\stageone} {stage-1\xspace}
+\newcommand{\stagetwo} {stage-2\xspace}
+\newcommand{\stagethr} {stage-3\xspace}
+
+\newcommand{\ztf} {ZTF\xspace}
+\newcommand{\lsst} {LSST\xspace}
+\newcommand{\lsstuk} {LSST:UK\xspace}
+\newcommand{\lasair} {Lasair\xspace}
+
+\newcommand{\wfau} {WFAU\xspace}
+\newcommand{\iris} {IRIS\xspace}
+\newcommand{\uedin} {University of Edinburgh\xspace}
+\newcommand{\testplatform} {test platform\xspace}
+
+\newcommand{\crossmatch} {cross-match\xspace}
+
+\usepackage{color}
+\usepackage{listings}
+\usepackage{changepage}
+
+\definecolor{codeblue}{RGB}{42,0.0,255}
+\definecolor{codegreen}{RGB}{63,127,95}
+\definecolor{codelilac}{RGB}{127,0,85}
+
+\lstloadlanguages{Java}
+\lstdefinestyle{Java}{
+    language=Java,
+    basicstyle=\ttfamily\footnotesize,
+    backgroundcolor=\color{white},
+    commentstyle=\color{codegreen}\textit,
+    keepspaces=true,
+    keywordstyle=\color{codeblue},
+    morekeywords={enum},
+    }
+
+\lstloadlanguages{SQL}
+\lstdefinestyle{SQL}{
+    language=SQL,
+    basicstyle=\ttfamily\footnotesize,
+    backgroundcolor=\color{white},
+    commentstyle=\color{codegreen}\textit,
+    keepspaces=true,
+    keywordstyle=\color{codeblue},
+    morekeywords={enum},
+    }
+
+% \usepackage[dvipsnames]{xcolor}
+\newcommand\YAMLcolonstyle{\color{codelilac}}
+\newcommand\YAMLkeystyle{\color{codeblue}}
+\newcommand\YAMLvaluestyle{\color{codegreen}}
+
+\makeatletter
+% here is a macro expanding to the name of the language
+% (handy if you decide to change it further down the road)
+\newcommand\language@yaml{yaml}
+
+\expandafter\expandafter\expandafter\lstdefinelanguage
+\expandafter{\language@yaml}{
+    basicstyle=\ttfamily\footnotesize\YAMLkeystyle,
+    backgroundcolor=\color{white},
+    keywords={true,false,null,y,n},
+    keywordstyle=\color{codeblue},
+    basicstyle=\YAMLkeystyle, % assuming a key comes first
+    sensitive=false,
+    comment=[l]{\#},
+    morecomment=[s]{/*}{*/},
+    commentstyle=\color{codegreen}\textit,
+    stringstyle=\color{codegreen}\textit,
+    moredelim=[l][\color{orange}]{\&},
+    moredelim=[l][\color{magenta}]{*},
+    moredelim=**[il][\YAMLcolonstyle{:}\YAMLvaluestyle]{:}, % switch to value style at :
+    morestring=[b]',
+    morestring=[b]",
+    literate =  {---}{{\ProcessThreeDashes}}3
+                {>}{{\textcolor{red}\textgreater}}1     
+                {|}{{\textcolor{red}\textbar}}1 
+                {\ -\ }{{\mdseries\ -\ }}3,
+}
+
+% switch to key style at EOL
+\lst@AddToHook{EveryLine}{\ifx\lst@language\language@yaml\YAMLkeystyle\fi}
+\makeatother
+\newcommand\ProcessThreeDashes{\llap{\color{codegreen}\mdseries-{-}-}}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\section{Introduction}
+\label{introduction}
+This document outlines a design for a scalable architecture to implement a real-time alert
+processing platform for \lsstuk, capable of handling the data rates expected during the
+lifetime of the \lsst project.
+
+The design criteria are based on the following requirements:
+\begin{itemize}
+  \item Capable of meeting the initial expected data rate from the \lsst project.
+  \item The ability to increase the processing speed of the system by adding new resources.
+  \item The ability to increase the storage capacity of the system by adding new resources.
+  \item How much downtime is required to add new resources to the system.
+  \item The resilience of the system to individual component failures.
+\end{itemize}
+
+An additional criteria is set by the requirements of the \lsstuk project and its
+links to the \iris eInfrastructure initiative and the DiRAC integrated super-computing facility.
+\begin{itemize}
+  \item Where possible implement the system using standard hardware resources.
+\end{itemize}
+
+The target data rates for the experiments are:
+\begin{itemize}
+  \item Sustained 1,000 alerts per second
+  \item Stretch goal 10,000 alerts per second
+\end{itemize}
+
+These numbers are based on the values given in table 29 of the \lsst System Science Requirements Document (LPM-17).
+
+\begin{quote}
+\textit{“Specification: The system should be capable of reporting such data for at least transN candidate transients per field of view and visit”}
+\end{quote}
+
+\begin{center}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textit{Quantity} & \textit{DesignSpec} & \textit{MinimumSpec} & \textit{StretchGoal} \\ \hline
+\textit{transN}   & $10^{4}$            & $10^{3}$             & $10^{5}$             \\ \hline
+\end{tabular}
+\end{center}
+
+The \textit{transN} value sets the number of alerts per visit, this combined with the expected cadence of 30 to 40 seconds per visit gives us our target evaluation criteria of 1,000 alerts per second and the stretch goal of 10,000 alerts per second for these experiment.
+
+To meet the scalability and fault tolerance requirements the architecture design for the alert processing system is based on a distributed micro-service architecture, where multiple instances of each component can be deployed in parallel, using Kafka data streams to distribute the alert data between each stage of the pipeline.
+
+\section{High level architecture}
+\label{high-level-architecture}
+
+The high level view of the architecture divides the system into three stages.
+
+\subsection{Stage 1, input buffer}
+\label{stage-1}
+
+The first stage of the \lsstuk system is a local \kafka mirror configured as a 7 day first-in first-out (FIFO) buffer of the live stream from \lsst. This buffer has a number of functions:
+
+\subsubsection{Local endpoint}
+\label{stage-1.local-endpoint}
+Access to the upstream \kafka endpoint provided by \lsst is bandwidth limited, and only a select group of clients will be allowed to connect to it. Even if these restrictions are relaxed it will still make sense for each project to only make one connection to the upstream service.
+This is particularly relevant in our case, as our connection to the upstream service involves a trans-Atlantic connection.
+Implementing a mirror of the upstream service will provide a local \kafka endpoint for our components to connect to, enabling multiple components to connect to the \kafka stream at the same time.
+
+\subsubsection{Local buffer}
+\label{stage-1.local-buffer}
+Configuring our mirror of the upstream service as a 7 day FIFO buffer, makes our system more resilient to networking issues and component failures.
+If a component in our system fails, the 7 day buffer gives us time to fix the issue, test and restart the failed component using data from our local buffer.
+
+\subsubsection{Partition count}
+\label{stage-1.partition-count}
+The number of partitions in a \kafka stream puts an upper limit on the level of parallelism that downstream components can apply to processing a stream (see section \ref{kafka-partitions}).
+Deploying a buffer at the input to our system give us direct control over the number of partitions available to the rest of our processing components.
+
+\subsubsection{Schema mapping}
+\label{stage-1.schema-mapping}
+The current stream from \ztf uses an inline schema to describe each \avro message.
+Every message carries a copy of it's schema embedded in it.
+This means the alert messages are self describing, and provides some insulation from side effects of schema changes for clients.
+
+Our understanding is that the \lsst project intend to use a \schemaregistry to describe their \avro schema, and each message will only include the schema identifier rather than the full schema. This reduces the overhead associated with using an inline schema to describe the messages. However, the schema identifier will be specific to the upstream project's \schemaregistry, and so we will need to provide a mapping from their schema identifiers to the corresponding schema identifiers in our own local \schemaregistry.
+This translation can be handled by our buffer service, replacing the upstream schema identifier with the the corresponding local identifier as it receives the messages.
+
+\subsubsection{Topic merge}
+\label{stage-1.topic-merge}
+The current stream from \ztf is published as a series of separate 'daily' topics, one for each night of observations. Our understanding is that the \lsst project are likely to do the same for their stream.
+Handling the data in chunks like this a useful format to manage the bulk transfer and archiving of the data. It makes it easy to refer to \textit{"the data from yesterday"} or \textit{"the data from three days ago"}. However, in terms of our end users, they are likely to want to access \textit{"the live data from \lsst"}, in one continuous stream.
+Our input buffer can take the data from each of the separate 'daily' topics and publish them locally as one continuous stream.
+
+\subsubsection{Test data}
+\label{stage-1.test-data}
+The same \kafka service can also provide access to a set of test data that will be useful for our own integration testing, and for end users developing and testing their own custom processors.
+
+Example test data:
+\begin{itemize}
+  \item Known sets of simulated data for specific scenarios.
+  \item Known subsets of historical data from \ztf.
+  \item \ztf data with static, inline and registered schema.
+  \item \lsst data with static, inline and registered schema.
+\end{itemize}
+
+The advantage of using the same \kafka service to store and serve test data is it means our components can use the same libraries and configuration tools in development, testing and live production.
+
+As part of our work for \phasea of the \lsstuk project we have been experimenting with maintaining a \kafka service configured as a rolling 7 day FIFO buffer, a source for test data and as a permanent data archive.
+In the process we have learned a lot about configuring and administering \kafka services, which we describe in more detail in section \ref{kafka-compendium}.
+The key points are :
+\begin{itemize}
+    \item Deploying \kafka as a 7 day FIFO buffer requires very little additional configuration.
+    \item Having access to a set of test data is extremely useful for developing processing components. However, if the tests are intended to gather performance statistics, then care is needed to coordinate the tests and isolate them from each other.
+    \item It is possible to configure \kafka as a long term data archive. However, we encountered some issues to do with maintaining the data and \kafka is probably not the best tool for this. 
+\end{itemize}
+
+To date these experiments have been using the standard \mirrormaker service from the \apachekafka project.
+We have not experimented with developing our own implementation of the \mirrormaker service needed to provide the additional functionality such as topic merging and schema translation described above.
+
+\subsection{Stage 2, workflow components}
+\label{stage-2}
+The second stage of processing consists of a set of loosely coupled components that consume data from a stream, apply a filter or processing step, and produce a new stream of results.
+
+\kafka is designed to distribute messages to multiple clients reading messages from the same topic at different speeds. Section \ref{kafka-offsets} describes how \kafka supports this in more detail, but what it means for us is we can have multiple different components subscribed to the output of the \stageone buffer processing the messages at different rates without interfering with each other.
+
+A mixture of slow, low bandwidth, components gradually working through the alert messages can subscribe to the same \kafka topic as high speed, high bandwidth, components processing the alert messages as fast as possible. The \kafka service takes care of buffering the data so that all of the components get to see all of the alert messages in the right order.
+
+\subsubsection{High speed components}
+\label{stage-2.high-speed.components}
+
+Some example high speed processors might include :
+\begin{itemize}
+  \item Cross-match alert messages with a watch list and trigger actions.
+  \item Cross-match alert messages with archive catalogs and generate annotated results.
+\end{itemize}
+
+These examples are considered high speed components is because their output will be used as the input for other components, creating a pipeline or workflow.
+They must be able to process the incoming data as fast as it is arriving, producing their results with the minimum latency between input and output.
+In order to meet these requirements, these components are designed to be able to run multiple instances in parallel, increasing the data throughput by processing multiple alert messages at a time.
+
+Some example medium speed components might include :
+\begin{itemize}
+  \item Read alert messages and write candidates to \cassandra database.
+  \item Read alert messages and write candidates to \mariadb database.
+\end{itemize}
+
+These examples are considered medium speed components because the performance of the database they are writing to will be a limiting factor in determining the maximum data rate they can handle. A key factor in the performance of these components will depend on whether the database platform they are using is able to handle multiple writes in parallel.
+
+%As part of our work for \phasea of the \lsstuk project we have performed some initial experiments looking at %the performance achievable writing alert message candidates to a \cassandra database. The results of these %tests are described in more detail in section \ref{cassandra-writer}.
+
+\subsubsection{Low speed processors}
+\label{stage-2.low-speed.processors}
+
+Some example low speed components might include :
+\begin{itemize}
+  \item Read alert messages and write them to \avro files for backup.
+  \item Read alert messages and write candidates to \parquet files for downstream \spark analysis.
+  \item Read alert messages, extract the light curves and write them to \fits or \votable files for downstream analysis.
+  \item Read alert messages, extract the images and write them to FITS/PNG/JPEG files for downstream display or analysis.
+\end{itemize}
+
+These examples are considered low speed processors because there is no science case requirement for them to produce results at high speed. Depending on the amount of data processing required by their algorithm they can operate with a small number of concurrent processes.
+
+However, they will still need to be able to meet a minimum level of processing speed in order to process a days worth of data within a day. Based on our experience with \ztf the input data rate is likely to be non-uniform, periods with a very high rate of alerts, and periods with a much lower rate, and the daily totals can vary by several orders of magnitude (from 100 to 1,000,000 alerts per night).
+While the low speed components don't need to be able to match the peak bandwidth of the busy periods, they do need to be able to process the cumulative data from each night fast enough to have completed each night's worth of data in time to start processing the next night's data.
+
+\subsubsection{Component libraries}
+\label{stage-2.component-libraries}
+
+In order to help develop these processors and filters, the project should provide a set of Java and Python libraries that implement all of the functionality needed to connect to Kafka services, subscribe to topics, read and write messages, serialize and deserialize the \avro messages into class objects etc.
+
+Using a common set of well tested libraries helps to make our own components easier to develop and more reliable to use. It also helps to lower the barrier to entry for 3rd party developers to create their own processors and filters.
+
+As part of our work for \phasea of the \lsstuk project we developed a set of Java components that worked as a prototype demonstrator for this architecture.
+
+We also looked at automating the deployment of the components using a common \yaml configuration file syntax that enables non-programmers to connect together stream processing components to build a workflow.
+
+Further details of the Java classes and \yaml configuration syntax are given in sections \ref{component-libraries.java-interfaces} and \ref{workflow-configuration}.
+
+\subsection{Stage 3, Spark analysis}
+\label{stage-3}
+
+As part of our work for \phasea of the \lsstuk project we were able to do some background research into a number of different analysis platforms in use in the data analytics field and some of the capabilities provided by the different software platforms available.
+
+Based on the results of our research, we expect that it will be possible to meet the majority of our science use cases using the Spark Structured Streaming processing engine coupled with the customized filtered streams produced by the \stagetwo processing chains.  
+%https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html
+
+We did not have time to work directly with the \spark packages during \phasea, and this should be a priority for our work in \phaseb.
+
+%\section{Phase-A experiments}
+%\label{experiments}
+%
+%As part of our work for \phasea of the \lsstuk project we performed a number of experiments that looked a %specific parts of the design outlined in the previous sections.
+
+\section{Deployment platforms}
+\label{deployment-platforms}
+
+The software components developed for the \phasea experiments were deployed both on a set of physical test-bed machines at ROE, and on an \openstack platform provided by the \uedin IT services.
+
+Using two different systems helped us to learn how to administer the platforms, to evaluate the costs and benefits of the different platforms, and how suitable they would be for deploying the live production system.
+
+\subsection{\eleanor \openstack}
+\label{deployment-eleanor.openstack}
+
+Some of the initial \kafka experiments for \phasea of the \lsstuk project were deployed on the \eleanor \openstack platform provided by \uedin IT services.
+%https://www.ed.ac.uk/information-services/computing/computing-infrastructure/cloud-computing-service/researcher-cloud-service-eleanor
+
+As part of our work on this deployment we developed set of shell script tools for managing virtual machines on the \eleanor \openstack system.
+
+The tools are packaged in an \docker container that includes the \openstack command line client and a set of scripts that help to manage virtual machines in an \openstack system along with some parser utilities that make it easier to handle the \eleanor specific syntax for things like virtual machine flavors and internal and external network addresses.
+
+%https://github.com/lsst-uk/phymatopus/blob/master/docker/openstack-client/
+
+The experiments deployed on the \eleanor system included a number of different \kafka configurations to provide a long term archive, a rolling 7 day buffer, and a combination of the two.
+
+During this work we discovered and solved a number of minor issues involved with administering \kafka deployments. Many of these were simply discovering easy to make mistakes, learning how to identify them, and figuring out good practice rules for avoiding them.
+
+Some of the key lessons learned were:
+\begin{itemize}
+    \item Configuring \kafka as a FIFO buffer is close to the default 'out of the box` configuration.
+    \item Configuring \kafka as a long term archive is possible, but there are issues regarding data management that mean it is probably not the best solution for this. 
+    \item A \kafka server instance will fail fast. If there is anything wrong with the service or it's configuration, e.g. out of disc space in a log directory, it will disconnect itself from the \kafka cluster and shut itself down.
+    \item The host names or IP addresses used for the \kafka server endpoint addresses need to be resolvable and accessible from both inside and outside the \openstack system, which can cause problems at the network routing level when using \docker containers inside \openstack.
+\end{itemize}
+
+Further details of these issues and their solutions are given in section \ref{kafka-compendium}.
+
+\subsection{Testbed platform}
+\label{deployment-testbed.platform}
+
+As part of our work for \phasea of the \lsstuk project we were involved in specifying and configuring the hardware for the \testplatform used for the experiments.
+
+Over the duration of the \phasea work the \testplatform has grown from two to four to six machines. Setting up a test system for just the two machines available at the start of \phasea did not justify the cost in time and resources of deploying a full \openstack system from scratch. In fact with just two machines available the \openstack services themselves would have take up a significant portion of the available resources leaving little space left for running the tests.
+
+As a result the development of the \testplatform started with a basic deployment of \libvirt and added layers of tools as and when they were required.
+
+Another reason for not using \openstack to provision resources on the \testplatform is that one of the things we wanted to look at was how different configurations of software and hardware effected the system performance. To do this we needed very direct control over how and where the resources were allocated and direct access to the underlying hardware to be able to monitor the system performance. 
+
+For a project of experiments that are looking at a higher level in the software stack it probably would make sense to deploy an \openstack system on the \testplatform and use that to provision resources.
+
+\subsection{\ischnura \libvirt}
+\label{deployment.ischnura-libvirt}
+
+The current configuration of the \testplatform use the  \ischnura tools available on \github to provision virtual machines on the worker nodes.
+%https://github.com/Zarquan/ischnura
+
+The \ischnura tools provide a simple cookie-cutter tool for creating identical virtual machines as quickly as possible.
+
+As part of our work for \phasea of the \lsstuk project we modified the \ischnura tools to use the same  \cloudinit process that is used by \openstack to configure user accounts and ssh keys in new virtual machines.
+%https://cloud-init.io/
+%https://cloudinit.readthedocs.io/en/latest/#
+
+As a result of this work the administrator account in a new virtual machine will be initialized automatically with the correct user account and ssh keys whether created using the \ischnura tools on the \testplatform or on an \openstack platform.
+This means we can use the same deployment scripts for configuring a new system on the \testplatform, the \eleanor \openstack system at the \uedin or an \openstack system provided by \iris.
+
+\subsection{Network configuration}
+\label{deployment-testbed.network-layers}
+
+The network configuration for the \testplatform has evolved over the period of the \phasea project as the test requirements changed and the number of physical machines grew. 
+
+The initial deployment used the default NAT based networking available as part of a standard \libvirt deployment. This works for local services deployed on virtual machines running on the same physical host. As soon as we needed to have components running on different physical hosts we needed to replace this with a network capable of spanning multiple physical machines.
+
+The first iteration of this was to use a \textit{'routed'} network configuration that still used the local \dnsmasq service provided by \libvirt on each of the physical machines, but configured the \libvirt network to act as a router, making the the virtual machines accessible on the wider network.
+To enable name resolution between virtual machines the full set of IP addresses and host names were added to the \texttt{/etc/hosts} file on each physical machine, 
+This was sufficient to enable services and clients on different virtual machines to connect to each other, as long as the physical hosts are connected to the same physical network segment.
+This is quick and easy to set up for a small number of physical machines, but becomes progressively more complex to administer as the number of machines increases.
+In theory it would be possible to automate the configuration of this using a deployment tool such as \ansible. However, beyond about two or three physical hosts the law of diminishing returns applies and it was better to spend the resources setting up a full virtual network for the \testplatform.
+
+The third iteration of network configuration for the \testplatform defined a virtual local area network (VLAN) at the level of the data center network switches, which means the physical machines are connected to their own separate virtual network isolated from the rest of the university systems. The network interface on each physical host is configured as a bridge interface, and the \libvirt network layer is configured to connect network interfaces on the virtual machines directly to the bridge interface on their host. The result is that all of the physical and virtual machines are connected to the same local network, and everyone can 'see' and reach everyone else.
+
+\subsection{\texttt{dnsmasq} service}
+\label{deployment-testbed.dnsmasq}
+
+The third iteration of network configuration placed all of the virtual machines on the same VLAN as their physical hosts, with the \libvirt network configured as a direct connection to the bridge interface. This means that we can no longer use the \dnsmasq service provided by the local \libvirt instance on each of the physical machines.
+
+As part of our work for \phasea of the \lsstuk project we a developed the configuration for a \docker deployment of \dnsmasq to provide the DNS and DHCP services needed to manage the IP addresses and host names for the virtual machines.
+
+The \docker container deployment uses a vanilla \dnsmasq \docker container from Storytel and adds the configuration files needed to define a set of MAC addresses, IP addresses and hostnames for the virtual machines.
+%https://github.com/Storytel/dnsmasq
+%https://hub.docker.com/r/storytel/dnsmasq/dockerfile
+
+Although there is no technical requirement to allocate these addresses on a per host basis, we used a specific pattern to map specific groups of addresses to the virtual machines running on each physical host.
+This means it is possible to identify which virtual machine is running on which physical machine just by looking at the MAC or IP address. This is extremely useful when trying debug network issues by looking at capture logs of network traffic.
+
+The \dnsmasq \docker container was originally deployed on one of the \testplatform worker nodes, but it has since been moved to a separate physical machine allocated specifically for this purpose.
+Deploying the \dnsmasq service in a \docker container made this transition much easier, and paid back the original investment in time used to set up the \docker deployment.
+Once the \dnsmasq was moved off the worker node, it means all of the \testplatform worker nodes are configured as vanilla \libvirt hosts with no unique configuration or services on any of them.
+ 
+Source code and notes for the network configuration are published in the \esperia \github project.
+%https://github.com/wfau/esperia
+
+\subsection{Ansible deployment}
+\label{deployment-testbed.ansible}
+
+The next stage of work on the \testplatform will be to develop the current configuration into a set of \ansible scripts to automate the process of configuring the \dnsmasq service and deploying \libvirt and \ischnura on the worker nodes.
+
+\subsection{Virtual machine image}
+\label{deployment-vm-image}
+
+As part of our work for \phasea of the \lsstuk project we developed a standard virtual machine image to be used for all of the tests and service deployments. Using the same base image throughout all of the experiments has a number of advantages:
+\begin{itemize}
+    \item Version control of the image ensures that the tests are performed under the same conditions.
+    \item The same environment and tools are always available for deployment, testing and debugging.
+\end{itemize}
+
+The virtual machine image developed for the project is a minimal install of \redhat \fedora with the community edition of the \docker platform-as-a-service (\paas) tools.
+
+The creation of the virtual machine image is automated using a \kickstart script which is available on \github as part of the \ischnura project.
+%https://en.wikipedia.org/wiki/Kickstart_(Linux)
+%https://pykickstart.readthedocs.io/en/latest/kickstart-docs.html
+
+%https://github.com/Zarquan/ischnura/blob/master/src/kickstart/fedora-docker-base.txt
+
+The virtual machine image is configured with a default user account, \stevedore, which replaces the normal default account for \redhat \fedora.
+The \stevedore user account is listed in the \texttt{sudo} list, and is a member of the \texttt{users}, \texttt{wheel} and \texttt{docker} groups. This last group grants the account permission to create and manage \docker containers.
+
+\subsection{\docker \btrfs storage driver}
+\label{docker.btrfs.}
+
+Based on our previous work using \docker
+%https://arxiv.org/abs/1707.03341
+we opted to use a  \btrfs \filesystem on the virtual machines and configured the \docker service to use the \btrfs storage driver because we have found this combination gives better performance than the default \textit{OverlayFS} storage driver normally used with \docker.
+
+Although the \btrfs \filesystem is still considered experimental by many system administrators, based on our own experience of using \btrfs for a number of years in a range of different applications we have found it to be both reliable and performant compared to more conventional \filesystem formats.
+
+\section{Crossmatch algorithms}
+\label{crossmatch-algorithms}
+
+As part of our work for \phasea of the \lsstuk project we developed a series of experiments to compare the performance of different cross match algorithms, database platforms and indexing to identify the best option for implementing a cross-match component capable of matching the live alert stream from \lsst against the large science catalogs held by \wfau.
+
+The experiments compared the Hierarchical Triangular Mesh (HTM) algorithm used to index many of the \wfau catalogs with a zones based algorithm described in a 2004 Microsoft Research paper by J.Gray et al. 
+
+The target criteria for these experiments is to demonstrate a cross match implementation capable of meeting the target of 1,000 alerts per second, and be able to scale up to meet the higher stretch goals by adding additional resources.
+
+The source code for these tests is available on \github in the \enteucha project.
+%https://github.com/lsst-uk/enteucha
+
+\subsection{Hierarchical Triangular Mesh}
+\label{crossmatch.htm}
+
+The Hierarchical Triangular Mesh (HTM) algorithm starts by dividing the celestial sphere into 8 spherical triangles, and then recursively builds a quad-tree decomposing each triangle into 4 sub-triangles.
+
+The following references explain the algorithm in more detail :
+The Hierarchical Triangular Mesh, P. Z. Kunszt et al.
+%https://link.springer.com/chapter/10.1007/10849171_83
+The Indexing of the SDSS Science Archive, P. Z. Kunszt et al.
+%http://www.skyserver.org/HTM/doc/adass99.ps
+SkyServer HTM Documentation
+%http://www.skyserver.org/HTM/doc/intro.aspx
+
+The code to implement the HTM algorithm used in our tests is based on the Java library available from the SkyServer website at John Hopkins University.
+%http://www.skyserver.org/htm/implementation.aspx#download
+
+Due to licensing issues we are unable to make this part of our code open source at this time.
+
+\subsection{Zone based algorithm}
+\label{crossmatch-zones}
+
+The zones based indexing uses a much simpler method of dividing the celestial sphere into thin horizontal zones based simply on the declination.
+
+\begin{lstlisting}[]
+zoneNumber = floor((dec+90) /zoneHeight)
+\end{lstlisting}
+
+Details of how the algorithm works are described in Technical Report MSR-TR-2004-32 by Jim Gray published by Microsoft Research in 2004.
+\textit{There Goes the Neighborhood: Relational Algebra for Spatial Data Search, J. Gray et al}
+https://arxiv.org/pdf/cs/0408031.pdf
+
+More recently, the same zone based indexing has been used as part of the \textit{Astronomy eXtensions for Spark (AXS)} toolkit for the \apachespark platform, described in a 2019 paper by Petar Zečević et al.
+\textit{AXS: A framework for fast astronomical data processing based on Apache Spark}
+https://arxiv.org/abs/1905.09034
+
+The initial step of the zone based algorithm is much simpler to implement and faster to execute than the equivalent steps of in HTM algorithm, requiring only simple floating point and integer arithmetic operations compared to the complex trigonometry involved in the HTM algorithm.
+
+The trade off is to start the selection process using very simple steps, significantly reducing the amount of data involved, and then use more complex steps later in the process.
+
+\subsection{Database platform}
+\label{database-platform}
+
+Due to the nature of the problem, performing a \crossmatch using a conventional database system tends to be limited by physical I/O performance. The overhead of getting the data off disc can obscure the relative performance of the indexing algorithms.
+
+In order to maximize the performance, the following experiments were performed using in-memory databases. Once the I/O data access bottle neck is removed from the equation, the differences between the indexing algorithms becomes much more significant.
+
+The database tests used an in-memory instance of the \hsqldb database engine to evaluate the different algorithms.
+
+HSQLDB (Hyper SQL Database) Java relational database management system.
+%http://hsqldb.org/
+
+\subsection{Algorithm comparison}
+\label{database-algorithms}
+
+The HTM tests used the Java library from JHU to calculate which triangles intersected the target region and then queried the database to find all the sources within those triangles.
+
+The zone based tests calculated which zones intersected the target region and then queried the database to find all the sources within those zones.
+
+The tests showed a significant advantage to the zone based algorithm, demonstrating a performance increase of a factor of 10 compared to the HTM algorithm.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textit{Algorithm} & \textit{Data size} & \textit{Matched} & \textit{Time}  \\ \hline
+HTM   & 4,000,000 rows & 10 rows & 213ms \\ \hline
+Zones & 4,000,000 rows & 11 rows & 17ms  \\ \hline
+\end{tabular}
+\end{table}
+
+It is important to note that development time for this project was limited,and we did not set out to perform an accurate or comprehensive performance benchmark of the two algorithms.
+The objective of these experiments was to check the findings in the paper by Gray et al; that the zone based algorithm was simpler to implement and performed significantly faster than the HTM algorithm.
+After the initial tests confirmed that this was the case we moved on to exploring optimizations to see how fast we could get the zone based algorithm to perform.
+As a result, the database queries and indexing used in the HTM version were not optimized.
+If an accurate benchmark is needed then it would be worth re-visiting the code and optimizing the HTM implementation to get the best performance from it.
+
+\subsection{Database indexing}
+\label{database-indexing}
+
+The next set of tests looked at the database query and indexing used in the zone based algorithm.
+
+The SQL query used for the tests came from the query outlined in the paper by Gray, which included all three steps in the same query. The initial selection for the target Zone based on declination, the selection within the zone based on right ascension, and then a final selection based on distance.
+
+\begin{lstlisting}[style=SQL]
+    SELECT
+        ...
+    FROM
+        zones
+    WHERE
+        zone BETWEEN ? AND ?
+    AND
+        ra BETWEEN ? AND ?
+    AND
+        dec BETWEEN ? AND ?
+    AND
+        (power((cx - ?), 2) + power((cy - ?), 2) + power(cz - ?, 2)) < ?
+\end{lstlisting}
+
+The tests evaluated three different indexing schemes, the first scheme created three separate indexes, one index on the integer zone id, one on the right ascension and one on the declination.
+
+\begin{lstlisting}[style=SQL]
+    CREATE INDEX zoneindex ON zones (zone)
+    CREATE INDEX raindex   ON zones (ra)
+    CREATE INDEX decindex  ON zones (dec)
+\end{lstlisting}
+
+The second scheme created two separate indexes, one index for the integer zone id alone, and one index on the right ascension and declination combined.
+
+\begin{lstlisting}[style=SQL]
+    CREATE INDEX zoneindex  ON zones (zone)
+    CREATE INDEX radecindex ON zones (ra, dec)
+\end{lstlisting}
+
+The third scheme created a complex index of zone id, right ascension and declination combined.
+
+\begin{lstlisting}[style=SQL]
+    CREATE INDEX complexindex ON zones (zone, ra, dec)
+\end{lstlisting}
+
+The database tests showed that for this particular complex query, the combined and complex indexes performed better than the separate single value indexes.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textit{Index type} & \textit{Data size} & \textit{Search time} \\ \hline
+Separate & 2,563,201 & 83ms \\ \hline
+Combined [ra,dec] & 2,563,201 & 50ms \\ \hline
+Complex  [zone,ra,dec] & 2,563,201 & 38ms \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{CQEngine implementation}
+\label{cqengine-implementation}
+
+At this point we began to develop a native Java implementation of the zone algorithm using the \cqengine Collection Query Engine library to index data in Java Collections.
+%https://github.com/npgall/cqengine
+
+This version implemented the zone algorithm directly in Java code, using the \cqengine classes to implement an indexed collection of zones:
+
+\begin{lstlisting}[style=Java]
+    public class ZoneMatcherImpl
+    implements ZoneMatcher
+        {
+        ....
+        private final IndexedCollection<ZoneImpl> zones =
+            new ConcurrentIndexedCollection<ZoneImpl>();
+        ....
+        }
+\end{lstlisting}
+
+and an indexed collection of positions within each zone:
+
+\begin{lstlisting}[style=Java]
+    public class ZoneImpl
+    implements Zone
+        {
+        ....
+        private final IndexedCollection<PositionImpl> positions =
+            new ConcurrentIndexedCollection<PositionImpl>();
+        ....
+        }
+\end{lstlisting}
+
+These tests showed a significant advantage to the native Java implementation, which out performed the \hsqldb database implementation by a factor of 10.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textit{Database} & \textit{Data size} & \textit{Search time} \\ \hline
+In-memory \hsqldb & 2,563,201 & 38ms \\ \hline
+In-memory \cqengine & 2,563,201 & 3ms \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Collection indexing}
+\label{cqengine-indexing}
+
+The next set of tests looked at different ways of indexing the data in the \cqengine Collections.
+
+The tests looked at three different indexing schemes for the inner \texttt{ConcurrentIndexedCollection} of positions. The first scheme simply created separate indexes on right ascension and declination.
+
+\begin{lstlisting}[style=Java]
+    positions.addIndex(
+        NavigableIndex.onAttribute(
+            ZoneMatcherImpl.POS_RA
+            )
+        );
+
+    positions.addIndex(
+        NavigableIndex.onAttribute(
+            ZoneMatcherImpl.POS_DEC
+            )
+        );
+\end{lstlisting}
+
+The second scheme created separate indexes, using a quantized index on right ascension.
+
+\begin{lstlisting}[style=Java]
+    positions.addIndex(
+        NavigableIndex.withQuantizerOnAttribute(
+            DoubleQuantizer.withCompressionFactor(
+                5
+                ),
+            ZoneMatcherImpl.POS_RA
+            )
+        );
+
+    positions.addIndex(
+        NavigableIndex.onAttribute(
+            ZoneMatcherImpl.POS_DEC
+            )
+        );
+\end{lstlisting}
+
+The third scheme created a combined \texttt{CompoundIndex} on right ascension and declination together.
+
+\begin{lstlisting}[style=Java]
+    positions.addIndex(
+        CompoundIndex.onAttributes(
+            ZoneMatcherImpl.POS_RA,
+            ZoneMatcherImpl.POS_DEC
+            )
+        );
+\end{lstlisting}
+
+These tests showed a significant advantage for the separate simple indexes for this particular use case:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textit{Index type} & \textit{Data size} & \textit{Search time} \\ \hline
+Combined indexes & 12,587,009 & 42ms \\ \hline
+Quantized ra index & 12,587,009 & 21ms \\ \hline
+Separate indexes & 12,587,009 & 0.45ms \\ \hline
+\end{tabular}
+\end{table}
+
+The results of the indexing tests match the way that the algorithm was implemented in the database version and the native Java version.
+
+The \hsqldb database implementation used a single SQL query to perform all three stages of the zone algorithm, selecting the zone, selecting positions within the zone based on \textit{ra} and \textit{dec} and then performing the final distance calculation all in one database query. It therefore makes sense that the combined and complex indexes performed better than the separate single value indexes for this case.
+
+The \cqengine implementation performed the three stages of the zone algorithm, selecting the zone, selecting positions within the zone and then performing the final distance calculation as separate steps in the Java program.  It therefore makes sense that using three separate indexes gave the best performance for this implementation.
+
+\subsection{Zone height}
+\label{zone-height}
+
+The final set of tests looked at the relationship between the size of the zones, search radius and performance. Due to limited time we were unable to develop a detailed model of the relationship . However we were able to confirm the general rule described in Gray et al; That the algorithm produced the best results when the zone height was close to or equal to the search radius. 
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textit{Data size} & \textit{Zone height} & \textit{Search radius} & \textit{Search time (ms)} \\ \hline
+12,587,009 & 0.25       & 0.015625 & 1.665 \\ \hline
+12,587,009 & 0.125      & 0.015625 & 2.312 \\ \hline
+12,587,009 & 0.0625     & 0.015625 & 0.669 \\ \hline
+12,587,009 & 0.03125    & 0.015625 & 0.528 \\ \hline
+12,587,009 & 0.015625   & 0.015625 & 0.419 \\ \hline
+12,587,009 & 0.0078125  & 0.015625 & 0.450 \\ \hline
+12,587,009 & 0.00390625 & 0.015625 & 0.607 \\ \hline
+\end{tabular}
+\end{table}
+
+\subsection{Summary of results}
+\label{crossmatch-summary}
+
+Based on the test results, this set of experiments have been able to demonstrate a cross match algorithm that is capable of meeting the target data rate of 1,000 alerts per second for catalog sizes of the order of 12 million sources. Further testing will be needed to demonstrate how this capability can be scaled to handle larger data sets.
+
+There is more  that could be done to develop these experiments further, extending the size of the test data set, optimizing the indexing and exploring the relationship between zone size, search radius and search performance.
+
+There is also more work to do to explore ways to make the system scalable and fault tolerance.
+
+To meet the scalability and fault tolerance criteria we need to look at ways to distribute the crossmatch searches over multiple machines.
+
+There are two aspects to the scalability question:
+
+    • How to increase the processing rate.
+    • How to increase the data size.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Component libraries}
+\label{component-libraries}
+
+The following section describe in more detail some of the components that could be used to implement the second stage of the architecture design. Providing a framework to support loosely coupled components that consume data from a stream, apply a filter or processing step, and produce a new stream of results.
+
+\subsection{Class interfaces}
+\label{component-libraries.java-interfaces}
+
+The following section describe some of the Java classes and interfaces developed as part of our work for \phasea of the \lsstuk project. 
+
+\subsubsection{Processor}
+\label{java-interfaces.Processor}
+
+The key interfaces in the framework is an interface for a class that can process a candidate :
+
+\begin{lstlisting}[style=Java]
+    /**
+     * Interface for a Candidate processor.
+     */
+    interface Processor
+        {
+        /**
+         * Process method response codes.
+         */
+        enum Response {
+            PASS,
+            SKIP
+            };
+
+        /**
+         * Process a Candidate and return a response code.
+         */
+        public Response process(Candidate candidate);
+        }
+\end{lstlisting}
+
+This interface simply defines a \texttt{process()} method that takes a \texttt{Candidate} object as input and
+returns a simple response code, either \texttt{PASS} or \texttt{SKIP}.
+
+The meaning of the result codes are :
+\begin{itemize}
+  \item \texttt{PASS} - Processing completed, pass the \texttt{Candidate} on to the next step.
+  \item \texttt{SKIP} - Processing completed, skip any further steps.
+\end{itemize}
+
+\subsubsection{Component}
+\label{java-interfaces.Component}
+
+The framework also provides a template implementation of a component that can connect to a Kafka service, subscribed to a topic, read alert messages from the topic, deserialized them into Java objects and passes each \texttt{Candidate} object to a \texttt{process()} method.
+
+\begin{lstlisting}[style=Java]
+    /**
+     * A component template that includes methods for connecting
+     * and subscribing to Kafka streams, reading messages and
+     * deserializing alert Candidates.
+     */
+    public class Component
+        {
+        //
+        // Methods for connecting and subscribing to Kafka streams,
+        // reading messages and deserializing alert Candidates.
+        //
+
+        /**
+         * Template method to process a candidate.
+         *
+         */
+        public void process(Candidate candidate)
+            {
+            //
+            // Code to process a Candidate goes here ...
+            //
+            }
+        }
+\end{lstlisting}
+
+Extend this a bit further, adding a list of \texttt{Processor} instances and a \texttt{for} loop to iterate through the list, we can define a \texttt{Component} that applies a sequence of  \texttt{Processor}s to an input stream of \texttt{Candidate}s.
+
+\begin{lstlisting}[style=Java]
+    /**
+     * A component template that includes methods for connecting
+     * and subscribing to Kafka streams, reading messages and
+     * deserializing alert Candidates.
+     */
+    public class Component
+        {
+        //
+        // Methods for connecting and subscribing to Kafka streams,
+        // reading messages and deserializing alert Candidates.
+        //
+
+        /**
+         * Initialise our array of processors.
+         *
+         */
+        public void init()
+            {
+            }
+
+        /**
+         * Our list of Processors.
+         *
+         */
+        private List<Processor> processors =
+            new ArrayList<Processor>();
+
+        /**
+         * Top level method to process a candidate.
+         *
+         */
+        public void process(Candidate candidate)
+            {
+            // Iterate the list of processors.
+            foreach (Processor processor : this.processors)
+                {
+                // Pass the candidate to the processor.
+                Response response = processor.process(candidate);
+
+                // If the processor response is SKIP.
+                if (response == SKIP)
+                    {
+                    // Skip the rest of the list and continue
+                    // to the next candidate.
+                    continue;
+                    }
+                }
+            }
+        }
+\end{lstlisting}
+
+\subsubsection{SolarSystemFilter}
+\label{java-interfaces.SolarSystemFilter}
+
+To implement a specific alert processor, the end user only has to provide one or more classes that implement the \texttt{Processor} to populate the list. A simple example of a \texttt{Processor} implementation would be a a solar system object filter.
+
+For alerts that correspond to known solar system objects the \ztf and \lsst alert messages will contain information about the corresponding solar system object.
+
+In the \ztf alert schema these include :
+\begin{itemize}
+  \item \texttt{ssnamenr} Name of nearest known solar system object if exists within 30 arcsec (from MPC archive).
+  \item \texttt{ssdistnr} Distance to nearest known solar system object if exists within 30 arcsec [arcsec].
+  \item \texttt{ssmagnr} Magnitude of nearest known solar system object if exists within 30 arcsec (usually V-band from MPC archive) [mag].
+\end{itemize}
+
+If we assume alerts that correspond to known solar system objects will have the solar system object name set, and alerts that do not correspond to known solar system objects will have a null value, then we can implement a simple \texttt{Processor} that filters alert candidates and selects those that have been matched with a corresponding solar system object.
+
+\begin{lstlisting}[style=Java]
+    /**
+     * A filter to detect solar system objects.
+     *
+     */
+    class SolarSystemFilter implements Processor
+        {
+        /**
+         * Check the 'ssnamenr' attribute.
+         * @return PASS if it is not null.
+         *
+         */
+        public Response process(Candidate candidate)
+            {
+            if (candidate.ssnamenr != null)
+                {
+                return PASS;
+                }
+            else {
+                return SKIP;
+                }
+            }
+        }
+\end{lstlisting}
+
+If we add an instance of this class to the list of \texttt{Processors} in an alert processor, we create a processor that will only pass on alert candidates that have been associated with a known solar system object.
+
+\begin{lstlisting}[style=Java]
+    class MySolarSystemComponent
+        extends Component
+        {
+        /**
+         * Initialise our List of processors.
+         *
+         */
+        public void init()
+            {
+            // Initialise our list.
+            super.init();
+
+            // Add a solar system object filter
+            this.processors.add(
+                new SolarSystemFilter()
+                );
+            }
+        }
+\end{lstlisting}
+
+The result is a processor component with all the code for connecting and subscribing to \kafka streams, reading messages and deserializing alert Candidates, plus a filter that selects solar system objects.
+
+\subsubsection{DatabaseWriter}
+\label{java-interfaces.DatabaseWriter}
+
+Using the same interfaces we can also create a \texttt{Processor} class which writes \texttt{Candidate} objects to a database table.
+
+\begin{lstlisting}[style=Java]
+    class MyDatabaseWriter implements Processor
+        {
+        //
+        // Code to connect to a database.
+        //
+
+        /**
+         * Write the Candidate to a database table.
+         * @return Always returns PASS.
+         *
+         */
+        public Response process(Candidate candidate)
+            {
+            //
+            // Code to write a Candidate(s) to a database table.
+            //
+            return PASS;
+            }
+        }
+\end{lstlisting}
+
+We can now create a component that combines the two processors to filter out solar system objects from the input stream and write them to a database table.
+
+\begin{lstlisting}[style=Java]
+    class MySolarSystemComponent
+        extends Component
+        {
+        /**
+         * Initialise our List of processors.
+         *
+         */
+        public void init()
+            {
+            // Initialise our list.
+            super.init();
+
+            // Add the solar system filter
+            this.processors.add(
+                new SolarSystemFilter()
+                );
+
+            // Add the database writer
+            this.processors.add(
+                new MyDatabaseWriter(
+                    "databasename",
+                    "tablename"
+                    )
+                );
+            }
+        }
+\end{lstlisting}
+
+In practice, the project would provide a basic toolkit of processor classes, including processors to write to a range of different database platforms, processors that write messages to \kafka streams, generate \voevent messages, write to a Slack channel or send emails.
+
+\subsection{Workflow configuration}
+\label{workflow-configuration}
+
+It is also possible to provide tools for creating processing components and the processors they contain from a simple configuration file. This would enable end users to combine processor classes from the library to create their own processing chains just by writing a \json or \yaml configuration file.
+
+\subsubsection{Solar system example}
+\label{workflow.solar-system}
+
+For example, the following \yaml fragment defines a processing component based on the \texttt{Component} described above, with a an extended version of the \texttt{SolarSystemFilter} that selects alerts associated with named solar system objects, and writes them to a \mariadb database.
+
+\begin{lstlisting}[language=yaml]
+  component:
+    type: "processing-node"
+      params:
+        - kafkaurl: "kafka-head:9092"
+          topicid: "ztf-buffer"
+          groupid: "groupid-f2542d11-1872bee0c055"
+
+      processors:
+
+        filter:
+          class:
+            "uk.org.example.SolarSystemFilter"
+          params:
+            - action: "include"
+            - targets:
+              - "saturn"
+              - "jupiter"
+
+        writer:
+          class:
+            "uk.org.example.MariaDBWriter"
+          params:
+            - tablename: "ztfevents"
+              database:  "jdbc:mariadb://hostname:3306/dbname"
+              username:  "Albert"
+              password:  "Saxe-Coburg-Saalfeld"
+\end{lstlisting}
+
+The component designer creates this \yaml configuration file, or use a GUI design tool that creates \yaml configuration files like this, and submits it to the system.
+
+The framework behind would create the processing component wrapped up as a \docker container and pass it to the orchestration layer to run one or more instances of it in parallel.
+
+This is a deliberately simplified example, and there are many more details to work out, including user accounts, permissions and access controls to limit who is allowed to connect to which streams, who is allowed to create new streams, and what compute resources they are allowed to use etc.
+
+However, this example is enough to demonstrate the ideas behind a basic framework which enables project developers, and potentially end users, to create alert processing pipelines from a toolkit of building blocks provided by the project.
+
+\subsubsection{Lasair ingestion}
+\label{workflow.lasair-ingestion}
+
+Based on this design we can imagine a number of building blocks that could be used to implement parts of the \lasair ingestion process.
+
+Our example list of low speed processors could all be implemented as processing components wrapped up in \docker containers, subscribed to the \stageone input buffer.
+
+\begin{itemize}
+  \item Read \avro messages and write them to \avro files for backup.
+  \begin{itemize}
+    \item Implemented as a \texttt{Processor} that serializes \texttt{Candidate} data to \avro files.
+  \end{itemize}
+
+  \item Read alert messages and write candidates to \parquet files for downstream \spark analysis.
+  \begin{itemize}
+    \item Implemented as a \texttt{Processor} that serializes \texttt{Candidate} data to \parquet files.
+  \end{itemize}
+
+  \item Read alert messages, extract the light curves and write them to \fits or \votable files for downstream analysis.
+  \begin{itemize}
+    \item Implemented as a \texttt{Processor} that extracts light curve data from the \texttt{Candidate} and serializes it to a \fits file.
+  \end{itemize}
+
+  \item Read alert messages, extract the images and write them to \fits, \png or \jpeg files for downstream display or analysis.
+  
+  \begin{itemize}
+    \item Implemented as a \texttt{Processor} that extracts the images from the \texttt{Candidate} and serialises them to a variety of image formats.
+  \end{itemize}
+\end{itemize}
+
+Using the proposed architecture, all of these could be described using the \yaml configuration file format, deployed automatically and managed by our orchestration system.
+
+We have already discussed how to implement a filter that selects \texttt{Candidates} that are associated with known solar system objects. This filter could be combined with different database writers to build a set of components that write data about solar system objects to different storage databases.
+
+\begin{itemize}
+    \item A \texttt{Component} that selects \texttt{Candidates} that are associated with solar system objects and writes them to a \mariadb database:
+    \begin{itemize}
+        \item \texttt{SolarSystemFilter} configured to include any solar system object.
+    \end{itemize}
+    \begin{itemize}
+        \item \texttt{MariaDBWriter} writes solar-system alerts in a \mariadb database.
+    \end{itemize}
+\end{itemize}
+
+\begin{itemize}
+    \item A \texttt{Component} that selects \texttt{Candidates} that are associated with solar system objects and writes them to a \cassandra database:
+    \begin{itemize}
+        \item \texttt{SolarSystemFilter} configured to include any solar system object.
+    \end{itemize}
+    \begin{itemize}
+        \item \texttt{CassandraWriter} writes solar-system alerts in a \cassandra database.
+    \end{itemize}
+\end{itemize}
+
+If we create a \texttt{Processor} capable of writing data to a new \kafka stream, we can combine this with our \texttt{SolarSystemFilter} to create a component that reads messages from the \stageone input buffer, selects alert messages associated with known solar system objects and writes them to a new \kafka stream.
+
+\begin{itemize}
+    \item A \texttt{Component} that generates a new stream of \texttt{Candidates} that are associated with solar system objects:
+    \begin{itemize}
+        \item \texttt{SolarSystemFilter} configured to include any solar system object.
+    \end{itemize}
+    \begin{itemize}
+        \item \texttt{KafkaProducer} writes solar-system alerts to a new \kafka stream.
+    \end{itemize}
+\end{itemize}
+
+By extending the \texttt{SolarSystemFilter} to add a switch that either includes or excludes solar system \texttt{Candidates} we could create a component that generates a stream of \texttt{Candidates} that are not associated with any known solar system object.
+
+\begin{itemize}
+    \item A \texttt{Component} that generates a new stream of \texttt{Candidates} that are \textbf{not} associated with solar system objects:
+    \begin{itemize}
+        \item \texttt{SolarSystemFilter} configured to exclude any solar system object.
+    \end{itemize}
+    \begin{itemize}
+        \item \texttt{KafkaProducer} writes solar-system alerts to a new \kafka stream.
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Cross-match example}
+\label{workflow.cross-match}
+
+Section \ref{crossmatch-zones} describes the algorithms and indexing used in a set of experiments to look at a high speed \crossmatch for matching \texttt{Candidates} against a catalog of positions.
+
+However, at this level, the \crossmatch can be modelled as a \texttt{CatalogMatcher} component that matches each \texttt{Candidate} against the catalog of positions, adding an annotation to the \texttt{Candidate} to hold the result of the match.
+
+Each annotation contains an identifier and position for the \texttt{Candidate}, an identifier and position for the catalog entry it has been matched with and the distance between the two positions.
+
+\begin{lstlisting}[style=Java]
+    interface CandidateMatch
+        {
+        // Candidate position
+        long   candid();
+        double candra();
+        double canddec();
+
+        // Catalog position
+        long   catalogid();
+        long   sourceid();
+        double sourcera();
+        double sourcedec();
+
+        double distance();
+        }
+\end{lstlisting}
+
+We can extend the \texttt{Candidate} class, adding a list of cross matches, creating a new class, \texttt{AnnotatedCandidate}.
+
+\begin{lstlisting}[style=Java]
+    interface AnnotatedCandidate extends Candidate
+        {
+        List<CandidateMatch> matches();
+        }
+\end{lstlisting}
+
+We can use this to build a component that combines a \texttt{CatalogMatcher} that matches the candidates against a catalog and a \texttt{KafkaProducer} that send the results to a new stream.
+
+\begin{itemize}
+    \item A \texttt{CrossmatchComponent} that generates a new stream of cross-match annotated candidates :
+    \begin{itemize}
+        \item \texttt{CatalogMatcher} matches against a catalog and adds annotations.
+    \end{itemize}
+    \begin{itemize}
+        \item \texttt{KafkaProducer} writes annotated candidates to a new Kafka stream.
+    \end{itemize}
+\end{itemize}
+
+In most cases it does not make sense to cross match \texttt{Candidates} that have already been associated with know solar system objects, so we want to exclude the solar system objects from the cross-match processing.
+
+One way to achieve this would be to use separate stream processing Components and connect them together using a \kafka stream, connecting the output from the \texttt{SolarSystemComponent} to the input of the \texttt{CrossmatchComponent}.
+
+\begin{itemize}
+    \item A \texttt{Component} that generates a new stream of \texttt{Candidates} that are \textbf{not} associated with solar system objects:
+    \begin{itemize}
+        \item \texttt{SolarSystemFilter} configured to exclude any solar system object.
+    \end{itemize}
+    \begin{itemize}
+        \item \texttt{KafkaProducer} writes solar-system alerts to a new Kafka stream.
+    \end{itemize}
+\end{itemize}
+
+\begin{itemize}
+    \item A \texttt{Component} that generates a new stream of cross-match annotated \texttt{Candidates}:
+    \begin{itemize}
+        \item \texttt{CatalogMatcher} matches against a catalog and adds annotations.
+    \end{itemize}
+    \begin{itemize}
+        \item \texttt{KafkaProducer} writes annotated candidates to a new Kafka stream.
+    \end{itemize}
+\end{itemize}
+
+Alternatively, we could combine the \texttt{SolarSystemFilter} and \texttt{CatalogMatcher} processors in the same \texttt{Component} linking them together by adding both of them to the same List of \texttt{Processors}.
+
+\begin{itemize}
+    \item A \texttt{Component} that generates a new stream of cross-match annotated \texttt{Candidates} that are \textbf{not} associated with solar system objects:
+    \begin{itemize}
+        \item \texttt{SolarSystemFilter} configured to exclude any solar system object.
+    \end{itemize}
+    \begin{itemize}
+        \item \texttt{CatalogMatcher} matches against a catalog and adds annotations.
+    \end{itemize}
+    \begin{itemize}
+        \item \texttt{KafkaProducer} writes annotated candidates to a new Kafka stream.
+    \end{itemize}
+\end{itemize}
+
+In this example, the resource cost of the \texttt{SolarSystemFilter} is so low, the combined solution is probably the most practical. The resource cost of publishing the non-solar-system results as a separate stream and reading them back in to to the cross match processor out-weighs the minimal cost of implementing the simple \texttt{SolarSystemFilter}.
+
+In contrast, a \texttt{CrossmatchProcessor} for a large catalog requires a lot of resources to implement; significantly more resources than would be needed by an additional \kafka stream. So if we have multiple use cases that need to use the results of the cross-match, it would be better to do the cross-match calculation once and publish the results as a new stream of annotated Candidates. This new stream can then be used as the source stream for a range of different
+processors.
+
+In general, the cost/benefit of combining multiple \texttt{Processors} within a complex \texttt{Component}, or deploying them in separate \texttt{Components}, joining the output stream of one as the input to the next depends on the relative resource costs of performing the each of the processing steps compared to the resource cost of adding another Kafka stream.
+
+High cost processors like a \texttt{CrossmatchProcessor} are a better fit for deploying as separate Kafka streams. Low cost processors like our \texttt{SolarSystemFilter} are better suited to being combined into compound \texttt{Components}.
+
+In all probability, our use cases will need to use a combination of both methods for combining \texttt{Components} and \texttt{Processors}, complex \texttt{Components} and \kafka streams.
+
+\subsubsection{Kafka components}
+\label{workflow.kafka-components}
+
+Where we do need to use \kafka streams to link the input and outputs of \texttt{Components}, there are two options for deploying the \kafka services. 
+The first option is to simply add another stream to the existing \kafka service that is providing the \stageone input buffer. However, this may cause issues with resource contention for the physical network and disks.
+
+There will probably be a lot of \kafka clients subscribed to the output of the main \stageone \kafka buffer, and a similar number of clients will want to subscribe to the output of the main catalog cross match. Serving two heavily subscribed streams from the same logical \kafka service, served by the same set of physical \kafka servers, could cause resource contention (see section \ref{kafka-contention}).
+
+In which case, it makes sense to use multiple separate \kafka services deployed on separate physical servers to provide the internal streams between the workflow \texttt{Components}.
+
+To help configure and manage this interconnected graph of \kafka services and \texttt{Components} we can model the \kafka services themselves as components in a larger system, configured and deployed automatically using a similar \yaml configuration file as the processing components.
+
+\begin{lstlisting}[language=yaml]
+  component:
+    type: "kafka-buffer"
+    instances: 4
+    serviceid: "serviceid-903a2730-240426063766"
+
+    topics:
+
+      - topic:
+        - topicid: "topicid-c22d9283-11da68c07e00"
+          replication :  1
+          partitions  : 64
+
+      - topic:
+        - topicid: "topicid-6b5e41ac-c3b83507f47c"
+          replication :  1
+          partitions  : 64
+\end{lstlisting}
+
+Treating \kafka services as components makes it easy to deploy alongside the processing components. A single \yaml configuration file could describe a chain of \kafka buffers and processing nodes that work together to implement everything needed for a science use case.
+
+Readers familiar with the \docker eco-system will recognise a similarity between these \yaml configuration files and \dockercompose configuration files used to deploy groups of \docker containers.
+Implementing the system behind this framework will probably use many of the infrastructure orchestration tools provided by \openstack, \docker and \kubernetes.
+
+However, where possible we should avoid exposing these interfaces directly to either our science users or our system administrators. The component configuration outlined above is intended to provide thin interface layer that sits on top of the system level tools and processes.
+
+The goal of this interface is to provide an abstraction layer between the programming interface that the user interacts with and the technologies selected to implement the system underneath. We don't want to develop a new set of orchestration tools. Equally, we do not want implementation specific details of the underlying technologies to be exposed as part of the user interface (GUI or API).
+
+Designing our own an abstraction layer has a number of advantages.
+
+1) It provides a level of insulation between our users and the technologies we have selected to build the system. Containerization and container orchestration is new and rapidly changing field and the technologies behind it are themselves evolving rapidly.
+Using our own components for the the user facing interface means we can evolve our implementation to adopt new technologies as they become available without causing migration problems for our users.
+
+2) It is unlikely that one technology will provide everything we will need to implement all of the functionality we want to have. As a result we will need to use a combination of different technologies, tools and frameworks to implement the system. Each of which will have their own slightly different programming interface and configuration file syntax.
+Using our own components for the the user facing interface means our system can use a consistent programming interface and configuration syntax across all the different layers of the system.
+
+3) Using a mapping between our component configuration interface and the underlying technologies means it will be easier to make our components portable across a range of different platforms.
+
+Our initial system will probably be developed using a combination of \kvm, \openstack and \kubernetes. However, we may also want to implement a lightweight version using technologies such as \virtualbox and \vagrant to provide parts of the virtualization layer.
+As long as the lightweight platform uses the same \yaml syntax for the component configuration files and the same containerization layer interface, then a researcher could use the lightweight platform to develop their processing components using local test data, and be confident that they could deploy their processing components into a full scale system without having to make major changes.
+
+
+
+....
+
+
+
+\section{Kafka compendium}
+\label{kafka-compendium}
+
+\subsection{Kafka offsets}
+\label{kafka-offsets}
+
+\subsection{Kafka partitions}
+\label{kafka-partitions}
+
+\subsection{Kafka  archive}
+\label{kafka-archive}
+
+\subsection{Data archive}
+\label{kafka-contention}
+
+
+
+\subsection{Avro schema}
+\label{avro-schema}
+
+\subsubsection{Static schema}
+\label{avro-schema.static}
+
+\subsubsection{Inline schema}
+\label{avro-schema.inline}
+
+\subsubsection{Schema registry}
+\label{avro-schema.registry}
+
+
+
+
+\end{document}
