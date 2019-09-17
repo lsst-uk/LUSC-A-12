@@ -1,7 +1,7 @@
 \documentclass{article}
 \usepackage[utf8]{inputenc}
 
-\title{LUSC-A-12 LSST:UK phase-A technology experiments}
+\title{LUSC-A-13 LSST:UK phase-A technology experiments}
 \author{D. Morris}
 \date{September 2019}
 
@@ -236,13 +236,13 @@ Every message carries a copy of it's schema embedded in it.
 This means the alert messages are self describing, and provides some insulation from side effects of schema changes for clients.
 
 Our understanding is that the \lsst project intend to use a \schemaregistry to describe their \avro schema, and each message will only include the schema identifier rather than the full schema. This reduces the overhead associated with using an inline schema to describe the messages. However, the schema identifier will be specific to the upstream project's \schemaregistry, and so we will need to provide a mapping from their schema identifiers to the corresponding schema identifiers in our own local \schemaregistry.
-This translation can be handled by our buffer service, replacing the upstream schema identifier with the the corresponding local identifier as it receives the messages.
+This translation can be handled by the input buffer, replacing the upstream schema identifier with the the corresponding local identifier as it receives the messages.
 
 \subsubsection{Topic merge}
 \label{stage-1.topic-merge}
-The current stream from \ztf is published as a series of separate 'daily' topics, one for each night of observations. Our understanding is that the \lsst project are likely to do the same for their stream.
-Handling the data in chunks like this a useful format to manage the bulk transfer and archiving of the data. It makes it easy to refer to \textit{"the data from yesterday"} or \textit{"the data from three days ago"}. However, in terms of our end users, they are likely to want to access \textit{"the live data from \lsst"}, in one continuous stream.
-Our input buffer can take the data from each of the separate 'daily' topics and publish them locally as one continuous stream.
+The current stream from \ztf is published as a series of separate daily topics, one for each night of observations. Our understanding is that the \lsst project are likely to do the same for their stream.
+Handling the data in chunks like this a useful format to manage the bulk transfer and archiving of the data. It makes it easy to refer to [\textit{the data from yesterday}] or [\textit{the data from three days ago}]. However, in terms of our end users, they are likely to want to access [\textit{the live data from \lsst}], in one continuous stream.
+The input buffer can take the data from each of the separate daily topics and publish them locally as one continuous stream.
 
 \subsubsection{Test data}
 \label{stage-1.test-data}
@@ -766,9 +766,10 @@ There is also more work to do to explore ways to make the system scalable and fa
 To meet the scalability and fault tolerance criteria we need to look at ways to distribute the crossmatch searches over multiple machines.
 
 There are two aspects to the scalability question:
-
-    • How to increase the processing rate.
-    • How to increase the data size.
+\begin{itemize}
+    \item How to scale the processing rate.
+    \item How to scale the data size.
+\end{itemize}{}
 
 
 
@@ -1309,24 +1310,24 @@ Designing our own an abstraction layer has a number of advantages.
 Using our own components for the the user facing interface means we can evolve our implementation to adopt new technologies as they become available without causing migration problems for our users.
 
 2) It is unlikely that one technology will provide everything we will need to implement all of the functionality we want to have. As a result we will need to use a combination of different technologies, tools and frameworks to implement the system. Each of which will have their own slightly different programming interface and configuration file syntax.
-Using our own components for the the user facing interface means our system can use a consistent programming interface and configuration syntax across all the different layers of the system.
+Using our own components for the the user facing API means our system can use a consistent programming interface and configuration syntax across all the different layers of the system.
 
 3) Using a mapping between our component configuration interface and the underlying technologies means it will be easier to make our components portable across a range of different platforms.
 
 Our initial system will probably be developed using a combination of \kvm, \openstack and \kubernetes. However, we may also want to implement a lightweight version using technologies such as \virtualbox and \vagrant to provide parts of the virtualization layer.
 As long as the lightweight platform uses the same \yaml syntax for the component configuration files and the same containerization layer interface, then a researcher could use the lightweight platform to develop their processing components using local test data, and be confident that they could deploy their processing components into a full scale system without having to make major changes.
 
-
-
-....
-
-
-
 \section{Kafka compendium}
 \label{kafka-compendium}
 
+The following sections report on lessons learned from our experience of working with \kafka during \phasea of the \lsstuk project.
+
 \subsection{Kafka offsets}
 \label{kafka-offsets}
+
+A \kafka server stores data  for a stream as a sequential 
+
+
 
 \subsection{Kafka partitions}
 \label{kafka-partitions}
