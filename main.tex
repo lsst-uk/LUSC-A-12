@@ -1,11 +1,27 @@
 \documentclass{article}
 \usepackage[utf8]{inputenc}
+\usepackage[multiple]{footmisc}
 
-\title{LUSC-A-12 LSST:UK phase-A technology experiments}
+%\usepackage{graphicx}
+%\graphicspath{ {./images/} }
+
+\usepackage{svg}
+\usepackage{amsmath} 
+
+\title{LUSC-A-12 LSST:UK phase A alert handling and cross match experiments}
 \author{D. Morris}
 \date{September 2019}
 
 \setlength{\parskip}{1em}
+
+%\usepackage{natbib}
+%\bibliographystyle{abbrvnat}
+%\setcitestyle{authoryear,open={((},close={))}}
+
+\usepackage{breakurl}
+
+\usepackage[style=numeric]{biblatex}
+\addbibresource{references.bib}
 
 \usepackage{xspace}
 % Standard terms used throughout the document,
@@ -26,8 +42,9 @@
 
 \newcommand{\openstack} {OpenStack\xspace}
 \newcommand{\dnsmasq} {\texttt{dnsmasq}\xspace}
+\newcommand{\dns} {DNS\xspace}
+\newcommand{\dhcp} {DCHP\xspace}
 
-\newcommand{\eleanor} {Eleanor\xspace}
 \newcommand{\ischnura} {Ischnura\xspace}
 \newcommand{\esperia} {Esperia\xspace}
 \newcommand{\enteucha} {Enteucha\xspace}
@@ -39,35 +56,42 @@
 \newcommand{\stevedore} {\textit{Stevedore}\xspace}
 
 \newcommand{\btrfs} {\texttt{btrfs}\xspace}
-\newcommand{\filesystem} {files-ystem\xspace}
+\newcommand{\filesystem} {file-system\xspace}
+\newcommand{\scaleable} {scaleable\xspace}
 
 \newcommand{\paas} {PaaS\xspace}
+\newcommand{\datacenter} {datacenter\xspace}
 
 \newcommand{\redhat} {RedHat\xspace}
 \newcommand{\fedora} {Fedora\xspace}
 
 \newcommand{\github} {GitHub\xspace}
 
+\newcommand{\apache} {Apache\xspace}
 \newcommand{\kafka} {Kafka\xspace}
+\newcommand{\flink} {Flink\xspace}
 \newcommand{\spark} {Spark\xspace}
 \newcommand{\cassandra} {Cassandra\xspace}
-\newcommand{\apachekafka} {Apache Kafka\xspace}
-\newcommand{\apachespark} {Apache Spark\xspace}
 
 \newcommand{\kubernetes} {Kubernetes\xspace}
 \newcommand{\virtualbox} {VirtualBox\xspace}
 \newcommand{\vagrant} {Vagrant\xspace}
 \newcommand{\kvm} {KVM\xspace}
+\newcommand{\vlan} {VLAN\xspace}
+
+\newcommand{\fifo} {FIFO\xspace}
+\newcommand{\junit} {JUnit\xspace}
 
 \newcommand{\mariadb} {MariaDB\xspace}
 \newcommand{\hsqldb} {HSQLDB\xspace}
 \newcommand{\cqengine} {CQEngine\xspace}
+\newcommand{\crossmatch} {crossmatch\xspace}
 
 \newcommand{\mirrormaker} {Mirror Maker\xspace}
 \newcommand{\schemaregistry} {Schema Registry\xspace}
 
-\newcommand{\phasea} {phase-A\xspace}
-\newcommand{\phaseb} {phase-B\xspace}
+\newcommand{\phasea} {phase A\xspace}
+\newcommand{\phaseb} {phase B\xspace}
 \newcommand{\stageone} {stage-1\xspace}
 \newcommand{\stagetwo} {stage-2\xspace}
 \newcommand{\stagethr} {stage-3\xspace}
@@ -77,12 +101,21 @@
 \newcommand{\lsstuk} {LSST:UK\xspace}
 \newcommand{\lasair} {Lasair\xspace}
 
+\newcommand{\gaia} {Gaia\xspace}
+\newcommand{\cunine} {CU9\xspace}
+
+\newcommand{\cam} {Cambridge\xspace}
+\newcommand{\ral} {RAL\xspace}
+\newcommand{\roe} {ROE\xspace}
 \newcommand{\wfau} {WFAU\xspace}
 \newcommand{\iris} {IRIS\xspace}
 \newcommand{\uedin} {University of Edinburgh\xspace}
 \newcommand{\testplatform} {test platform\xspace}
 
-\newcommand{\crossmatch} {cross-match\xspace}
+\newcommand{\eleanor} {Eleanor\xspace}
+\newcommand{\cumulus} {Cumulus\xspace}
+
+\newcommand{\footurl}[1] {\footnote{\burl{#1}}}
 
 \usepackage{color}
 \usepackage{listings}
@@ -156,27 +189,30 @@
 
 \maketitle
 
+%TODO Citeable DOI GitHub repositories.
+%https://academia.stackexchange.com/a/20999
+%https://github.blog/2014-05-14-improving-github-for-science/
+%https://guides.github.com/activities/citable-code/
+
 \tableofcontents
 
 \section{Introduction}
 \label{introduction}
-This document outlines a design for a scalable architecture to implement a real-time alert
-processing platform for \lsstuk, capable of handling the data rates expected during the
-lifetime of the \lsst project.
+This document describes some experiments designed to address some of the challenges we expect to encounter implementing a scalable architecture for a real-time alert processing system for the \lsstuk\footurl{https://www.lsst.ac.uk/} project capable of handling the data rates expected during the lifetime of the \lsst\footurl{https://www.lsst.org/} project.
 
-The design criteria are based on the following requirements:
+The design criteria for the system include the following requirements:
 \begin{itemize}
   \item Capable of meeting the initial expected data rate from the \lsst project.
   \item The ability to increase the processing speed of the system by adding new resources.
   \item The ability to increase the storage capacity of the system by adding new resources.
-  \item How much downtime is required to add new resources to the system.
+  \item Minimising the downtime required to add new resources to the system.
   \item The resilience of the system to individual component failures.
 \end{itemize}
 
-An additional criteria is set by the requirements of the \lsstuk project and its
-links to the \iris eInfrastructure initiative and the DiRAC integrated super-computing facility.
+Additional criteria set by the requirements of the \lsstuk project and the planned deployment on resources provided by the \iris eInfrastructure initiative\footurl{https://www.iris.ac.uk/}:
 \begin{itemize}
-  \item Where possible implement the system using standard hardware resources.
+  \item It should be possible to implement the system using standard hardware resources.
+  \item It should be possible to deploy the system on generic cloud compute resources.
 \end{itemize}
 
 The target data rates for the experiments are:
@@ -185,7 +221,7 @@ The target data rates for the experiments are:
   \item Stretch goal 10,000 alerts per second
 \end{itemize}
 
-These numbers are based on the values given in table 29 of the \lsst System Science Requirements Document (LPM-17).
+These numbers are based on the values given in table 29 of the \lsst System Science Requirements Document (LPM-17)\footurl{https://docushare.lsst.org/docushare/dsweb/Get/LPM-17}.
 
 \begin{quote}
 \textit{“Specification: The system should be capable of reporting such data for at least transN candidate transients per field of view and visit”}
@@ -199,29 +235,40 @@ These numbers are based on the values given in table 29 of the \lsst System Scie
 \end{tabular}
 \end{center}
 
-The \textit{transN} value sets the number of alerts per visit, this combined with the expected cadence of 30 to 40 seconds per visit gives us our target evaluation criteria of 1,000 alerts per second and the stretch goal of 10,000 alerts per second for these experiment.
+The \textit{transN} value sets the number of alerts per visit, this combined with the expected cadence of 30 seconds per visit gives us our target evaluation criteria of 1,000 alerts per second and the stretch goal of 10,000 alerts per second for these experiment.
 
-To meet the scalability and fault tolerance requirements the architecture design for the alert processing system is based on a distributed micro-service architecture, where multiple instances of each component can be deployed in parallel, using Kafka data streams to distribute the alert data between each stage of the pipeline.
+To meet the scalability and fault tolerance requirements we developed a micro-service\footurl{https://microservices.io/} based design for the alert processing system, where multiple instances of each component can be deployed in parallel, using \kafka\footurl{https://kafka.apache.org/} to distribute the alerts between components in the pipeline.
 
-\section{High level architecture}
-\label{high-level-architecture}
+Our initial reason for selecting \kafka as the message transport technology was informed by the work done by M. Patterson\cite{Patterson_2018} and colleagues developing the alert processing infrastructure for the Zwicky Transient Facility (ZTF)\footurl{https://www.ztf.caltech.edu/} project.
 
-The high level view of the architecture divides the system into three stages.
+The \ztf alert processing infrastructure is considered a prototype for the \lsst alert processing infrastructure, which is planning to use a similar \kafka based system as the primary distribution protocol for the \lsst level 1 alert stream.
+
+Our initial introduction to \kafka was as the external site to site delivery protocol for the \ztf and \lsst alert streams. 
+
+However, \kafka was originally designed as an internal message delivery system for data streams processing applications within a data center, rather than an external site to site delivery system.
+
+As we learned more about \kafka and its capabilities it became clear that it would be an ideal technology for implementing the internal data streams linking together the individual micro-service components within the system, enabling us to build a flexible and \scaleable system.
+
+
+\section{High level outline}
+\label{high-level-outline}
+
+The proposed architecture design consists of three layers of components, connected together by \kafka streams.
 
 \subsection{Stage 1, input buffer}
 \label{stage-1}
 
-The first stage of the \lsstuk system is a local \kafka mirror configured as a 7 day first-in first-out (FIFO) buffer of the live stream from \lsst. This buffer has a number of functions:
+The first stage of the system architecture is a local \kafka mirror configured as a 7 day first-in first-out (\fifo) buffer of the live stream from \lsst. This buffer has a number of functions:
 
 \subsubsection{Local endpoint}
 \label{stage-1.local-endpoint}
-Access to the upstream \kafka endpoint provided by \lsst is bandwidth limited, and only a select group of clients will be allowed to connect to it. Even if these restrictions are relaxed it will still make sense for each project to only make one connection to the upstream service.
+Access to the upstream \kafka endpoint provided by \lsst is bandwidth limited, and will be limited to a small group of clients who are allowed to connect. Even if these restrictions are relaxed it will still make sense for each project to only make one connection to the upstream service.
 This is particularly relevant in our case, as our connection to the upstream service involves a trans-Atlantic connection.
-Implementing a mirror of the upstream service will provide a local \kafka endpoint for our components to connect to, enabling multiple components to connect to the \kafka stream at the same time.
+Implementing a mirror of the upstream service will provide a local \kafka endpoint for our other components to connect to, enabling multiple components to connect to the primary input \kafka stream without placing an unnecessary load on our external network connection or the upstream service.
 
 \subsubsection{Local buffer}
 \label{stage-1.local-buffer}
-Configuring our mirror of the upstream service as a 7 day FIFO buffer, makes our system more resilient to networking issues and component failures.
+Configuring our mirror of the upstream service as a 7 day \fifo buffer, makes our system more resilient to networking issues and component failures.
 If a component in our system fails, the 7 day buffer gives us time to fix the issue, test and restart the failed component using data from our local buffer.
 
 \subsubsection{Partition count}
@@ -231,18 +278,26 @@ Deploying a buffer at the input to our system give us direct control over the nu
 
 \subsubsection{Schema mapping}
 \label{stage-1.schema-mapping}
-The current stream from \ztf uses an inline schema to describe each \avro message.
-Every message carries a copy of it's schema embedded in it.
-This means the alert messages are self describing, and provides some insulation from side effects of schema changes for clients.
+The ZTF and LSST alert messages are encoded using the \apache\avro\footurl{https://avro.apache.org/} binary data serialization format. However, the data schema for the message content is serialized as a plain text \json\footurl{https://www.json.org/} document.
 
-Our understanding is that the \lsst project intend to use a \schemaregistry to describe their \avro schema, and each message will only include the schema identifier rather than the full schema. This reduces the overhead associated with using an inline schema to describe the messages. However, the schema identifier will be specific to the upstream project's \schemaregistry, and so we will need to provide a mapping from their schema identifiers to the corresponding schema identifiers in our own local \schemaregistry.
+The current stream from \ztf uses an inline schema to describe each message. Every message carries a copy of its schema embedded in it.
+This means the alert messages are self-describing, and provides some insulation from side effects of schema changes for clients.
+However, embedding the schema in every message adds a non-trivial overhead, particularly if the stream only contains a small number of well known message types.
+
+Our understanding is that the \lsst project intend to use a \schemaregistry\footurl{https://www.confluent.io/confluent-schema-registry/} to manage their \avro schema, and each message will only include a schema identifier rather than the full schema. This reduces the overhead associated with using an inline schema to describe the messages. However, the schema identifier will be specific to the upstream project's \schemaregistry. This means we will need to provide a mapping from their schema identifiers to the corresponding schema identifiers in our own local \schemaregistry.
 This translation can be handled by the input buffer, replacing the upstream schema identifier with the the corresponding local identifier as it receives the messages.
 
 \subsubsection{Topic merge}
 \label{stage-1.topic-merge}
 The current stream from \ztf is published as a series of separate daily topics, one for each night of observations. Our understanding is that the \lsst project are likely to do the same for their stream.
-Handling the data in chunks like this a useful format to manage the bulk transfer and archiving of the data. It makes it easy to refer to [\textit{the data from yesterday}] or [\textit{the data from three days ago}]. However, in terms of our end users, they are likely to want to access [\textit{the live data from \lsst}], in one continuous stream.
-The input buffer can take the data from each of the separate daily topics and publish them locally as one continuous stream.
+Handling the data in chunks like this a useful format to manage the bulk transfer and archiving of the data. When making backups or managing data transfers it is convenient to be able to refer to [\textit{the data from yesterday}] or [\textit{the data from three days ago}]. However, our end users are more likely to want to access [\textit{the live data from \lsst}], in one continuous stream.
+
+Ideally it would be useful to have access to both a single continuous stream for the science use cases, and a series of separate daily streams for system administration and backups.
+
+Depending on how the live data stream from \lsst is configured, as a single continuous stream or as separate daily topics, our \fifo buffer can either split the continuous stream into separate topics for the system administration tasks, or merge the separate topics into one continuous stream for our science use cases.
+
+By placing our own \fifo buffer at the head of our processing chain we are insulated from changes to the design of the upstream live stream from \lsst.
+Our \fifo buffer would handle changes to the topics and schema by the upstream service and present a consistent set of topics and schema to our internal components.
 
 \subsubsection{Test data}
 \label{stage-1.test-data}
@@ -258,17 +313,18 @@ Example test data:
 
 The advantage of using the same \kafka service to store and serve test data is it means our components can use the same libraries and configuration tools in development, testing and live production.
 
-As part of our work for \phasea of the \lsstuk project we have been experimenting with maintaining a \kafka service configured as a rolling 7 day FIFO buffer, a source for test data and as a permanent data archive.
-In the process we have learned a lot about configuring and administering \kafka services, which we describe in more detail in section \ref{kafka-compendium}.
+In order to evaluate this use case we have been experimenting with maintaining a \kafka service configured as a rolling 7 day \fifo buffer, using it as source for test data and as a permanent data archive.
+In the process we have learned a lot about configuring and administering \kafka services, which we describe in more detail in Section \ref{kafka-compendium}.
 The key points are :
 \begin{itemize}
-    \item Deploying \kafka as a 7 day FIFO buffer requires very little additional configuration.
+    \item Deploying \kafka as a 7 day \fifo buffer requires very little additional configuration. The default out of the box configuration deploys a simple \fifo buffer.
     \item Having access to a set of test data is extremely useful for developing processing components. However, if the tests are intended to gather performance statistics, then care is needed to coordinate the tests and isolate them from each other.
-    \item It is possible to configure \kafka as a long term data archive. However, we encountered some issues to do with maintaining the data and \kafka is probably not the best tool for this. 
+    \item It is possible to configure \kafka as a long term data archive. However, we encountered some issues to do with managing the service and maintaining the data which would suggest that \kafka is probably not the best tool for this. 
 \end{itemize}
 
-To date these experiments have been using the standard \mirrormaker service from the \apachekafka project.
-We have not experimented with developing our own implementation of the \mirrormaker service needed to provide the additional functionality such as topic merging and schema translation described above.
+To date these experiments have been using the standard \mirrormaker\footurl{https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27846330} service from the \apache \kafka project.
+In order to provide the additional functionality such as topic merging and schema translation we would need to develop our own implementation of the \mirrormaker service.
+Based on our experience of working with the tools and client libraries provided by the \apache \kafka project this should be relatively easy to implement.
 
 \subsection{Stage 2, workflow components}
 \label{stage-2}
@@ -283,8 +339,8 @@ A mixture of slow, low bandwidth, components gradually working through the alert
 
 Some example high speed processors might include :
 \begin{itemize}
-  \item Cross-match alert messages with a watch list and trigger actions.
-  \item Cross-match alert messages with archive catalogs and generate annotated results.
+  \item \crossmatch alert messages with a watch list and trigger actions.
+  \item \crossmatch alert messages with archive catalogs and generate annotated results.
 \end{itemize}
 
 These examples are considered high speed components is because their output will be used as the input for other components, creating a pipeline or workflow.
@@ -315,30 +371,26 @@ Some example low speed components might include :
 These examples are considered low speed processors because there is no science case requirement for them to produce results at high speed. Depending on the amount of data processing required by their algorithm they can operate with a small number of concurrent processes.
 
 However, they will still need to be able to meet a minimum level of processing speed in order to process a days worth of data within a day. Based on our experience with \ztf the input data rate is likely to be non-uniform, periods with a very high rate of alerts, and periods with a much lower rate, and the daily totals can vary by several orders of magnitude (from 100 to 1,000,000 alerts per night).
-While the low speed components don't need to be able to match the peak bandwidth of the busy periods, they do need to be able to process the cumulative data from each night fast enough to have completed each night's worth of data in time to start processing the next night's data.
+While the low speed components don't need to be able to match the peak bandwidth of the busy periods, they do need to be able to process the cumulative data from each night fast enough to have completed that night's worth of data before the next night's data begins.
 
 \subsubsection{Component libraries}
 \label{stage-2.component-libraries}
 
-In order to help develop these processors and filters, the project should provide a set of Java and Python libraries that implement all of the functionality needed to connect to Kafka services, subscribe to topics, read and write messages, serialize and deserialize the \avro messages into class objects etc.
+In order to help develop these processors and filters we should provide a set of Java and Python libraries that implement the support functionality needed to connect to \kafka services, subscribe to topics, read and write messages, serialize and deserialize \avro messages etc.
 
-Using a common set of well tested libraries helps to make our own components easier to develop and more reliable to use. It also helps to lower the barrier to entry for 3rd party developers to create their own processors and filters.
+Using a common set of well tested libraries will help to make our own components easier to develop and more reliable to use. It will also help to lower the barrier to entry for 3rd party developers to create their own processors and filters.
 
-As part of our work for \phasea of the \lsstuk project we developed a set of Java components that worked as a prototype demonstrator for this architecture.
-
+In order to support the \crossmatch tests described in Section \ref{crossmatch-algorithms} we developed a set of Java classes and interfaces that prototype this architecture.
 We also looked at automating the deployment of the components using a common \yaml configuration file syntax that enables non-programmers to connect together stream processing components to build a workflow.
 
-Further details of the Java classes and \yaml configuration syntax are given in sections \ref{component-libraries.java-interfaces} and \ref{workflow-configuration}.
+Further details of the Java API and a proposed configuration schema are given in sections \ref{component-libraries.java-interfaces} and \ref{workflow-configuration}.
 
 \subsection{Stage 3, Spark analysis}
 \label{stage-3}
 
-As part of our work for \phasea of the \lsstuk project we were able to do some background research into a number of different analysis platforms in use in the data analytics field and some of the capabilities provided by the different software platforms available.
+Part of our work for \phasea involved background research into a number of different analysis platforms in use in the data analytics field and some of the capabilities provided by the different software platforms available.
 
-Based on the results of our research, we expect that it will be possible to meet the majority of our science use cases using the Spark Structured Streaming processing engine coupled with the customized filtered streams produced by the \stagetwo processing chains.  
-%https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html
-
-We did not have time to work directly with the \spark packages during \phasea, and this should be a priority for our work in \phaseb.
+Based on the results of our research, we expect that it may be possible to meet a significant portion of our science use cases using something like the Spark Structured Streaming \footurl{https://spark.apache.org/docs/latest/structured-streaming-programming-guide.html} or \apache\flink\footurl{https://flink.apache.org/}  processing engines coupled with filtered streams produced by the \stagetwo processing components.
 
 %\section{Phase-A experiments}
 %\label{experiments}
@@ -348,182 +400,172 @@ We did not have time to work directly with the \spark packages during \phasea, a
 \section{Deployment platforms}
 \label{deployment-platforms}
 
-The software components developed for the \phasea experiments were deployed both on a set of physical test-bed machines at ROE, and on an \openstack platform provided by the \uedin IT services.
+The software components developed for the \phasea experiments were deployed twice, once on a set of physical machines at ROE, and again on an \openstack\footurl{https://www.openstack.org/} platform provided by the \uedin IT services.
 
-Using two different systems helped us to learn how to administer the platforms, to evaluate the costs and benefits of the different platforms, and how suitable they would be for deploying the live production system.
+Using the different systems helped us to learn how to manage service deployments, to evaluate the costs and benefits of the different platforms, and learn how suitable they would be for deploying live production services.
 
 \subsection{\eleanor \openstack}
 \label{deployment-eleanor.openstack}
 
-Some of the initial \kafka experiments for \phasea of the \lsstuk project were deployed on the \eleanor \openstack platform provided by \uedin IT services.
-%https://www.ed.ac.uk/information-services/computing/computing-infrastructure/cloud-computing-service/researcher-cloud-service-eleanor
+The first set of \kafka deployments for the \phasea  experiments were deployed on the \eleanor\footurl{https://www.ed.ac.uk/information-services/computing/computing-infrastructure/cloud-computing-service/researcher-cloud-service-eleanor}  \openstack platform provided by \uedin IT services.
 
-As part of our work on this deployment we developed set of shell script tools for managing virtual machines on the \eleanor \openstack system.
+To support this deployment we developed set of shell script tools for managing virtual machines on the \eleanor \openstack system. 
+The tools were packaged in a \docker container that included the \openstack command line client along with a set of shell scripts that helped to manage virtual machines and some parser utilities that make it easier to handle the \eleanor-specific syntax for things like virtual machine flavors and the internal and external network addresses.
 
-The tools are packaged in an \docker container that includes the \openstack command line client and a set of scripts that help to manage virtual machines in an \openstack system along with some parser utilities that make it easier to handle the \eleanor specific syntax for things like virtual machine flavors and internal and external network addresses.
+These \docker containers formed the basis for a set of toolkit containers containing client tools for \libvirt, \openstack and \ansible\footurl{https://www.ansible.com/} which have since been published as a separate project on \github\footurl{https://github.com/wfau/atolmis}.
 
-%https://github.com/lsst-uk/phymatopus/blob/master/docker/openstack-client/
+The experiments deployed on the \eleanor system explored a number of different \kafka configurations including a long term archive and a rolling 7 day FIFO buffer.
 
-The experiments deployed on the \eleanor system included a number of different \kafka configurations to provide a long term archive, a rolling 7 day buffer, and a combination of the two.
-
-During this work we discovered and solved a number of minor issues involved with administering \kafka deployments. Many of these were simply discovering easy to make mistakes, learning how to identify them, and figuring out good practice rules for avoiding them.
+During this work we discovered and solved a number of minor issues involved with administering \kafka deployments. Many of these were simply discovering easy-to-make mistakes, learning how to identify them, and figuring out good practice rules for avoiding them.
 
 Some of the key lessons learned were:
 \begin{itemize}
-    \item Configuring \kafka as a FIFO buffer is close to the default 'out of the box` configuration.
-    \item Configuring \kafka as a long term archive is possible, but there are issues regarding data management that mean it is probably not the best solution for this. 
-    \item A \kafka server instance will fail fast. If there is anything wrong with the service or it's configuration, e.g. out of disc space in a log directory, it will disconnect itself from the \kafka cluster and shut itself down.
-    \item The host names or IP addresses used for the \kafka server endpoint addresses need to be resolvable and accessible from both inside and outside the \openstack system, which can cause problems at the network routing level when using \docker containers inside \openstack.
+    \item Configuring \kafka as a \fifo buffer is close to the default 'out of the box` configuration.
+    \item Configuring \kafka as a long term archive is possible, but there are issues regarding data management that mean it is probably not the best solution (this is discussed in more detail in Section \ref{kafka-archive}). 
+    \item A \kafka instance will fail fast. If there is anything wrong with the service or its configuration, e.g. out of disc space in a log directory, it will disconnect itself from the \kafka cluster and shut itself down.
+    \item The host names or IP addresses used for the \kafka server endpoint addresses need to be resolvable and accessible from both inside and outside the \openstack system, which can cause problems at the network routing level when using \docker containers inside \openstack (see Section \ref{kafka-hostnames} for more details).
 \end{itemize}
 
-Further details of these issues and their solutions are given in section \ref{kafka-compendium}.
+Mid way through the series of \phasea experiments on \kafka the \eleanor system experienced a number of issues to do with the configuration of the \openstack network components which eventually lead to the platform being shutdown.
+An unintended side effect of this was that we gained experience in trying to maintain a \kafka service on an unstable platform, and learned some important insights into the stability and resilience of deploying services on a cloud compute infrastructure.
+The lessons learned from this experience is discussed in more detail in Section \ref{reliable-clouds}.
 
 \subsection{Testbed platform}
 \label{deployment-testbed.platform}
 
-As part of our work for \phasea of the \lsstuk project we were involved in specifying and configuring the hardware for the \testplatform used for the experiments.
+As part of our work for \phasea we were involved in specifying and configuring some of the hardware for the \lsstuk \testplatform installed at \roe.
 
-Over the duration of the \phasea work the \testplatform has grown from two to four to six machines. Setting up a test system for just the two machines available at the start of \phasea did not justify the cost in time and resources of deploying a full \openstack system from scratch. In fact with just two machines available the \openstack services themselves would have take up a significant portion of the available resources leaving little space left for running the tests.
+Over the duration of the \phasea work the \testplatform has grown from an initial set of two machines to six machines for the \lsstuk project and two machines for the \gaia \cunine project deployed in the same \datacenter at \roe (with to more expected early in 2020). Setting up a full \openstack deployment for just the two machines available at the start of \phasea did not justify the cost in time and resources it would involve. In fact with just two machines available the \openstack services themselves would have take up a significant portion of the available resources leaving little space left for running the tests.
 
-As a result the development of the \testplatform started with a basic deployment of \libvirt and added layers of tools as and when they were required.
+As a result the development of the \testplatform started with a basic deployment of \libvirt\footurl{https://libvirt.org/} and added layers of tools as and when they were required.
 
-Another reason for not using \openstack to provision resources on the \testplatform is that one of the things we wanted to look at was how different configurations of software and hardware effected the system performance. To do this we needed very direct control over how and where the resources were allocated and direct access to the underlying hardware to be able to monitor the system performance. 
+Another reason for not using \openstack to provision resources on the \testplatform is that one of the things we wanted to explore with the local \testplatform is how different configurations of software and hardware effected the system performance. To do this we needed direct control over how and where the resources were allocated and direct access to the underlying system to be able to monitor the performance. 
 
-For a project of experiments that are looking at a higher level in the software stack it probably would make sense to deploy an \openstack system on the \testplatform and use that to provision resources.
+Given that we now have access to at three different \openstack systems, the \eleanor system managed by \uedin IT services, the xyz system at \ral and the \cumulus cloud at \cam provided by \iris, it makes sense to keep the \testplatform for low level experiments with direct access to the physical hardware rather than adding the additional abstraction layers of an \openstack deployment.
 
 \subsection{\ischnura \libvirt}
 \label{deployment.ischnura-libvirt}
 
-The current configuration of the \testplatform use the  \ischnura tools available on \github to provision virtual machines on the worker nodes.
-%https://github.com/Zarquan/ischnura
+The current configuration (Q3 2019) of the \testplatform uses a set of command line tools available from the \ischnura project\footurl{https://github.com/Zarquan/ischnura} on \github
+to provision virtual machines on the worker nodes.
 
 The \ischnura tools provide a simple cookie-cutter tool for creating identical virtual machines as quickly as possible.
+However the \ischnura tools only supported basic \libvirt deployments with the user account and ssh keys hard coded into the virtual machine images.
+In order to support deployments on the \eleanor platform using the same virtual machine images we modified the \ischnura tools to use the same \cloudinit\footurl{https://cloud-init.io/} process that is used by \openstack to configure user accounts and ssh keys in new virtual machines.
 
-As part of our work for \phasea of the \lsstuk project we modified the \ischnura tools to use the same  \cloudinit process that is used by \openstack to configure user accounts and ssh keys in new virtual machines.
-%https://cloud-init.io/
-%https://cloudinit.readthedocs.io/en/latest/#
+This work involved modifying the \ischnura tools to write the details of the admin user account to a \cloudinit configuration file on the host system, wrap the directory containing the configuration file as an ISO9660\footurl{https://en.wikipedia.org/wiki/ISO_9660} image, and mount that as a CDROM device on the new virtual machine. During the boot process the \cloudinit software will check a number of different options for configuration information, including a standard location on the local network or local CDROM device. If it does find \cloudinit configuration data it will use the metadata to configure the admin account, including the list of ssh \texttt{authorized\_keys} and the \texttt{sudo} permissions.
 
-As a result of this work the administrator account in a new virtual machine will be initialized automatically with the correct user account and ssh keys whether created using the \ischnura tools on the \testplatform or on an \openstack platform.
-This means we can use the same deployment scripts for configuring a new system on the \testplatform, the \eleanor \openstack system at the \uedin or an \openstack system provided by \iris.
+As a result of this work the administrator account in a new virtual machine will be automatically initialized  with the correct user account and ssh keys whether created using the \ischnura on the \testplatform, at \roe, the \eleanor \openstack system at the \uedin or an \openstack system provided by \iris.
 
 \subsection{Network configuration}
 \label{deployment-testbed.network-layers}
 
 The network configuration for the \testplatform has evolved over the period of the \phasea project as the test requirements changed and the number of physical machines grew. 
 
-The initial deployment used the default NAT based networking available as part of a standard \libvirt deployment. This works for local services deployed on virtual machines running on the same physical host. As soon as we needed to have components running on different physical hosts we needed to replace this with a network capable of spanning multiple physical machines.
+The initial deployment used the default NAT\footurl{https://en.wikipedia.org/wiki/Network_address_translation} based networking available as part of a standard \libvirt deployment. This works for local services deployed on virtual machines running on the same physical host. As soon as we needed to have components running on different physical hosts we needed to replace this with a network capable of spanning multiple physical machines.
 
-The first iteration of this was to use a \textit{'routed'} network configuration that still used the local \dnsmasq service provided by \libvirt on each of the physical machines, but configured the \libvirt network to act as a router, making the the virtual machines accessible on the wider network.
+The first iteration of this was to use a \textit{'routed'} network configuration that still used the local \dnsmasq\footurl{http://www.thekelleys.org.uk/dnsmasq/doc.html} service provided by the \libvirt service on each of the physical machines, but configured the \libvirt network to act as a router, making the the virtual machines accessible on the wider network.
 To enable name resolution between virtual machines the full set of IP addresses and host names were added to the \texttt{/etc/hosts} file on each physical machine, 
 This was sufficient to enable services and clients on different virtual machines to connect to each other, as long as the physical hosts are connected to the same physical network segment.
 This is quick and easy to set up for a small number of physical machines, but becomes progressively more complex to administer as the number of machines increases.
 In theory it would be possible to automate the configuration of this using a deployment tool such as \ansible. However, beyond about two or three physical hosts the law of diminishing returns applies and it was better to spend the resources setting up a full virtual network for the \testplatform.
 
-The third iteration of network configuration for the \testplatform defined a virtual local area network (VLAN) at the level of the data center network switches, which means the physical machines are connected to their own separate virtual network isolated from the rest of the university systems. The network interface on each physical host is configured as a bridge interface, and the \libvirt network layer is configured to connect network interfaces on the virtual machines directly to the bridge interface on their host. The result is that all of the physical and virtual machines are connected to the same local network, and everyone can 'see' and reach everyone else.
+The third iteration of network configuration for the \testplatform defined a virtual local area network (\vlan)\footurl{https://en.wikipedia.org/wiki/Virtual_LAN} at the level of the \datacenter network switches, which means the physical machines are connected to their own virtual network isolated from the rest of the university systems. The network interface on each physical host is configured as a bridge interface, and the \libvirt network layer is configured to connect network interfaces on the virtual machines directly to the bridge interface on their host. The result is that all of the physical and virtual machines are connected to the same local network, and everyone can 'see' and reach everyone else.
 
 \subsection{\texttt{dnsmasq} service}
 \label{deployment-testbed.dnsmasq}
 
-The third iteration of network configuration placed all of the virtual machines on the same VLAN as their physical hosts, with the \libvirt network configured as a direct connection to the bridge interface. This means that we can no longer use the \dnsmasq service provided by the local \libvirt instance on each of the physical machines.
+Placing all of the virtual machines on the same \vlan as their physical hosts, with the \libvirt network configured as a direct connection to the bridge interface meant that we could no longer use the \dnsmasq service provided by the local \libvirt instance on each of the physical machines.
+In order to provide the \dhcp\footurl{https://en.wikipedia.org/wiki/Dynamic_Host_Configuration_Protocol} and \dns\footurl{https://en.wikipedia.org/wiki/Domain_Name_System} services needed to manage the IP addresses and host names across the whole of the \vlan we developed the configuration files for a \dnsmasq service to run in a \docker container.
 
-As part of our work for \phasea of the \lsstuk project we a developed the configuration for a \docker deployment of \dnsmasq to provide the DNS and DHCP services needed to manage the IP addresses and host names for the virtual machines.
+The \docker container deployment uses a vanilla \dnsmasq \docker container published by Storytel\footurl{https://github.com/Storytel/dnsmasq}\footurl{https://hub.docker.com/r/storytel/dnsmasq/dockerfile} and adds the configuration files needed to define a set of MAC addresses, IP addresses and hostnames for the virtual machines.
 
-The \docker container deployment uses a vanilla \dnsmasq \docker container from Storytel and adds the configuration files needed to define a set of MAC addresses, IP addresses and hostnames for the virtual machines.
-%https://github.com/Storytel/dnsmasq
-%https://hub.docker.com/r/storytel/dnsmasq/dockerfile
-
-Although there is no technical requirement to allocate these addresses on a per host basis, we used a specific pattern to map specific groups of addresses to the virtual machines running on each physical host.
+Although there is no technical requirement to allocate these addresses on a per host basis, we used a template pattern to map specific groups of addresses to the virtual machines running on each physical host.
 This means it is possible to identify which virtual machine is running on which physical machine just by looking at the MAC or IP address. This is extremely useful when trying debug network issues by looking at capture logs of network traffic.
 
 The \dnsmasq \docker container was originally deployed on one of the \testplatform worker nodes, but it has since been moved to a separate physical machine allocated specifically for this purpose.
 Deploying the \dnsmasq service in a \docker container made this transition much easier, and paid back the original investment in time used to set up the \docker deployment.
 Once the \dnsmasq was moved off the worker node, it means all of the \testplatform worker nodes are configured as vanilla \libvirt hosts with no unique configuration or services on any of them.
  
-Source code and notes for the network configuration are published in the \esperia \github project.
-%https://github.com/wfau/esperia
+Source code and notes for the network configuration are published in the \esperia \github project\footurl{https://github.com/wfau/esperia}.
 
 \subsection{Ansible deployment}
 \label{deployment-testbed.ansible}
 
-The next stage of work on the \testplatform will be to develop the current configuration into a set of \ansible scripts to automate the process of configuring the \dnsmasq service and deploying \libvirt and \ischnura on the worker nodes.
+The next stage of work on the \testplatform will be to develop the configuration and deployment scripts into a set of \ansible playbooks that automate the process of configuring the \dnsmasq service and deploying \libvirt and \ischnura on the worker nodes.
+
+At the time of writing (Q4 2019) much of the configuration and deployment scripts in the \esperia project have been replaced by \ansible playbooks.
+The \ansible playbooks have been extended to include setting the user accounts, ssh \texttt{authorized\_keys} and the \texttt{sudo} permissions on the physical machines. However configuring the primary network interfaces on the physical machines has not yet been implemented as an \ansible playbook. This is partly due to the chicken and egg problem inherent in trying to configure the primary network interfaces using a tool that needs a working network and ssh access to configure the target machines.
+
+The eventual aim is to have all of the system configuration automated as \ansible playbooks, enabling the \testplatform machines to be configured for other experiments and then wiped and re-configured back to the \testplatform settings automatically.
+
+Combining this with the work done by Li Teng\footurl{https://github.com/wfau/feipengsy} using Kayobe\footurl{https://github.com/openstack/kayobe} to deploy \openstack on hardware at \roe 
+will mean we can reconfigure the \testplatform hardware to use different deployment platforms for different tests and experiments.
 
 \subsection{Virtual machine image}
 \label{deployment-vm-image}
 
-As part of our work for \phasea of the \lsstuk project we developed a standard virtual machine image to be used for all of the tests and service deployments. Using the same base image throughout all of the experiments has a number of advantages:
+In order to provide a reliable base for the virtual machines we have developed a standard virtual machine image for all of the tests and service deployments. Using the same base image throughout all of the experiments has a number of advantages:
 \begin{itemize}
     \item Version control of the image ensures that the tests are performed under the same conditions.
     \item The same environment and tools are always available for deployment, testing and debugging.
 \end{itemize}
 
-The virtual machine image developed for the project is a minimal install of \redhat \fedora with the community edition of the \docker platform-as-a-service (\paas) tools.
+The virtual machine image developed for the project is based on a minimal install of \redhat \fedora\footurl{https://getfedora.org/}\footurl{https://en.wikipedia.org/wiki/Fedora_(operating_system)} Linux distribution and the community edition of the \docker platform-as-a-service (\paas) tools\footurl{https://boxboat.com/2018/12/07/docker-ce-vs-docker-ee/}.
 
-The creation of the virtual machine image is automated using a \kickstart script which is available on \github as part of the \ischnura project.
-%https://en.wikipedia.org/wiki/Kickstart_(Linux)
-%https://pykickstart.readthedocs.io/en/latest/kickstart-docs.html
+The creation of the image is automated using a \kickstart\footurl{https://en.wikipedia.org/wiki/Kickstart_(Linux)}\footurl{https://pykickstart.readthedocs.io/en/latest/kickstart-docs.html} script which is available on \github as part of the \ischnura project\footurl{https://github.com/Zarquan/ischnura/blob/master/src/kickstart/fedora-docker-base.txt}. The kickstart script starts with the base install of the operating system, adds a basic set of system administration tools and then configures the default user account, \stevedore, with permission to install and configure new software and to create and manage \docker containers inside the virtual machine.
 
-%https://github.com/Zarquan/ischnura/blob/master/src/kickstart/fedora-docker-base.txt
-
-The virtual machine image is configured with a default user account, \stevedore, which replaces the normal default account for \redhat \fedora.
-The \stevedore user account is listed in the \texttt{sudo} list, and is a member of the \texttt{users}, \texttt{wheel} and \texttt{docker} groups. This last group grants the account permission to create and manage \docker containers.
+The default user account has password access disabled, and is configured to only allow ssh access using public key authentication\footurl{https://serverpilot.io/docs/how-to-use-ssh-public-key-authentication}. However, the image itself does not contain any ssh keys. It relies on the orchestration tools to inject the correct ssh key when a virtual machine instance is created using the image as a template.
+To enable this to happen, the virtual machine image is configured to use the \cloudinit tools to discover the configuration data for the instance and use it to configure the ssh keys for the user account.
 
 \subsection{\docker \btrfs storage driver}
 \label{docker.btrfs.}
 
-Based on our previous work using \docker
-%https://arxiv.org/abs/1707.03341
-we opted to use a  \btrfs \filesystem on the virtual machines and configured the \docker service to use the \btrfs storage driver because we have found this combination gives better performance than the default \textit{OverlayFS} storage driver normally used with \docker.
+Based on our earlier work using \docker \cite{Morris-2017} we opted to use a \btrfs\footurl{https://btrfs.wiki.kernel.org/index.php/Main_Page}\footurl{https://en.wikipedia.org/wiki/Btrfs} \filesystem on the virtual machines and configured the \docker service to use the \btrfs storage driver. 
 
-Although the \btrfs \filesystem is still considered experimental by many system administrators, based on our own experience of using \btrfs for a number of years in a range of different applications we have found it to be both reliable and performant compared to more conventional \filesystem formats.
+Although the \btrfs \filesystem is still considered experimental by many system administrators, our own experience of using \btrfs for a number of years in a range of different applications we have found it to be both reliable and performant. In particular our experience of using it as the storage driver\footurl{https://docs.docker.com/v17.09/engine/userguide/storagedriver/btrfs-driver/} for \docker containers deployed inside virtual machines gives better results than the default \texttt{overlay2}\footurl{https://docs.docker.com/v17.09/engine/userguide/storagedriver/overlayfs-driver/#how-the-overlay2-driver-works} storage driver normally used with \docker.
 
 \section{Crossmatch algorithms}
 \label{crossmatch-algorithms}
 
-As part of our work for \phasea of the \lsstuk project we developed a series of experiments to compare the performance of different cross match algorithms, database platforms and indexing to identify the best option for implementing a cross-match component capable of matching the live alert stream from \lsst against the large science catalogs held by \wfau.
+One of the challenges the \lsstuk transient event processing will have to address is to \crossmatch the incoming event stream against archive databases of know objects. With this in mind we developed a series of experiments to compare the performance of different \crossmatch algorithms, database platforms and indexing to identify the best candidates for implementing a \crossmatch component capable of matching the live alert stream data rate from \lsst against the science catalogues held by \wfau.
 
-The experiments compared the Hierarchical Triangular Mesh (HTM) algorithm used to index many of the \wfau catalogs with a zones based algorithm described in a 2004 Microsoft Research paper by J.Gray et al. 
+The objective for these experiments is to demonstrate a \crossmatch implementation capable of meeting the target of 1,000 alerts per second set in the Introduction to this paper, and be able to scale up to meet the higher stretch goals by adding additional resources.
 
-The target criteria for these experiments is to demonstrate a cross match implementation capable of meeting the target of 1,000 alerts per second, and be able to scale up to meet the higher stretch goals by adding additional resources.
+The experiments compared two \crossmatch algorithms, the Hierarchical Triangular Mesh (HTM)
+algorithm currently used to index many of the \wfau catalogs compared with a zones based algorithm described in a 2004 Microsoft Research paper by J.Gray et al \cite{Gray-2004}.
 
-The source code for these tests is available on \github in the \enteucha project.
-%https://github.com/lsst-uk/enteucha
+The source code for these experiments is available in the \enteucha \footurl{https://github.com/lsst-uk/enteucha} project on \github.
 
 \subsection{Hierarchical Triangular Mesh}
 \label{crossmatch.htm}
 
-The Hierarchical Triangular Mesh (HTM) algorithm starts by dividing the celestial sphere into 8 spherical triangles, and then recursively builds a quad-tree decomposing each triangle into 4 sub-triangles.
+The Hierarchical Triangular Mesh (HTM) algorithm is described in a paper by Kunszt et al. presented at the ADASS conference in 1999 \cite{Kunszt-1999} and in a subsequent paper presented at the MPA/ESO/MPE Workshop in 2000 \cite{Kunszt-2000}.
 
-The following references explain the algorithm in more detail :
-The Hierarchical Triangular Mesh, P. Z. Kunszt et al.
-%https://link.springer.com/chapter/10.1007/10849171_83
-The Indexing of the SDSS Science Archive, P. Z. Kunszt et al.
-%http://www.skyserver.org/HTM/doc/adass99.ps
-SkyServer HTM Documentation
-%http://www.skyserver.org/HTM/doc/intro.aspx
+The HTM algorithm divides the celestial sphere into eight spherical triangles, and then recursively builds a quad-tree decomposing each triangle at \textit{m} into a set of 4 sub-triangles at level \textit{m+1}.
 
-The code to implement the HTM algorithm used in our tests is based on the Java library available from the SkyServer website at John Hopkins University.
-%http://www.skyserver.org/htm/implementation.aspx#download
+The identifier, or \textit{HTM name}, for a triangle at level \textit{n} is generated by encoding the index of the triangle within its parent \{0, 1, 2 ,3\}  as a two bit value, and concatenating this to the \textit{HTM name} of the parent triangle, \textit{n-1}, all the way up to one of the the eight top level \textit{0} triangles.
 
-Due to licensing issues we are unable to make this part of our code open source at this time.
+The resulting \textit{HTM name} can be used as an efficient index to identify triangles at any level in the hierarchical tree. The first two bits of the \textit{HTM name} identify the top level \textit{0} triangles, the next two bits identify the level \textit{1} triangles within the level \textit{0} parent.
+
+Performing a \crossmatch with this algorithm involves identifying the initial triangle that contains the target position, identifying the adjacent triangles that overlap a circle centered on the target point, load the data for objects within those triangles and then compare them to see if they match our target.
+
+The code to implement the HTM algorithm used in our tests is based on the Java library available from the SkyServer website at John Hopkins University\footurl{http://www.skyserver.org/HTM/doc/intro.aspx}\footurl{http://www.skyserver.org/htm/implementation.aspx}. However, due to licensing issues we are unable to make this part of our code open source at this time.
 
 \subsection{Zone based algorithm}
 \label{crossmatch-zones}
 
-The zones based indexing uses a much simpler method of dividing the celestial sphere into thin horizontal zones based simply on the declination.
+The zone based algorithm is described in a Technical Report MSR-TR-2004-32 by Jim Gray published by Microsoft Research in 2004 \cite{Gray-2004}.
+
+More recently, the same zone based indexing has been used as part of the \textit{Astronomy eXtensions for Spark (AXS)} toolkit for the \apache \spark platform, described in a 2019 paper by Petar Zečević et al \cite{Zecevic-2019}.
+
+The zone based algorithm uses a much simpler method of dividing the celestial sphere into thin horizontal zones based simply on the declination.
 
 \begin{lstlisting}[]
-zoneNumber = floor((dec+90) /zoneHeight)
+    zoneNumber = floor((dec+90)/zoneHeight)
 \end{lstlisting}
 
-Details of how the algorithm works are described in Technical Report MSR-TR-2004-32 by Jim Gray published by Microsoft Research in 2004.
-\textit{There Goes the Neighborhood: Relational Algebra for Spatial Data Search, J. Gray et al}
-https://arxiv.org/pdf/cs/0408031.pdf
-
-More recently, the same zone based indexing has been used as part of the \textit{Astronomy eXtensions for Spark (AXS)} toolkit for the \apachespark platform, described in a 2019 paper by Petar Zečević et al.
-\textit{AXS: A framework for fast astronomical data processing based on Apache Spark}
-https://arxiv.org/abs/1905.09034
-
-The initial step of the zone based algorithm is much simpler to implement and faster to execute than the equivalent steps of in HTM algorithm, requiring only simple floating point and integer arithmetic operations compared to the complex trigonometry involved in the HTM algorithm.
+The initial step of the zone based algorithm is much simpler to implement and faster to execute than the equivalent steps needed to locate the target triangle in the HTM algorithm, requiring only simple floating point and integer arithmetic operations compared to the complex trigonometry involved in the HTM algorithm.
 
 The trade off is to start the selection process using very simple steps, significantly reducing the amount of data involved, and then use more complex steps later in the process.
 
@@ -532,15 +574,255 @@ The trade off is to start the selection process using very simple steps, signifi
 
 Due to the nature of the problem, performing a \crossmatch using a conventional database system tends to be limited by physical I/O performance. The overhead of getting the data off disc can obscure the relative performance of the indexing algorithms.
 
-In order to maximize the performance, the following experiments were performed using in-memory databases. Once the I/O data access bottle neck is removed from the equation, the differences between the indexing algorithms becomes much more significant.
+In order to maximize the performance, the experiments used an in-memory instance of the Hyper SQL Database (\hsqldb)\footurl{http://hsqldb.org/} database engine to evaluate the different algorithms. The reasoning behind this is that once the I/O data access bottle neck is removed from the equation, the differences between the indexing algorithms becomes much more significant.
 
-The database tests used an in-memory instance of the \hsqldb database engine to evaluate the different algorithms.
+\subsection{Data generator}
+\label{test-data-generator}
 
-HSQLDB (Hyper SQL Database) Java relational database management system.
-%http://hsqldb.org/
+The aim of the experiments was to test the algorithms with large enough data sets to show up differences in the performance of the algorithms.
+A side effect of this was that loading and indexing the test data into the target systems took significantly more time than the actual test searches themselves.
+In order to mitigate this as much as possible, the data generator was designed to enable us to run a set of tests, add more data to the data set and then re-run the same tests again.
+
+The data generator was designed to add data successively larger and larger sets of points in a square grid around an initial central target point, scaling up the number of points by a power of 2 each time.
+After each iteration the test data set will contain \(((2^n)+1)^2\) points.
+
+Given an initial point at the center. The first pass of the algorithm will add eight additional points to create a 3x3 grid of points around the target. 
+\begin{figure}[h]
+\includesvg{images/data-count-01.svg}
+\caption{$n=1 \ :\ ((2^n)+1)^2 = 3^2 = 9 \ points, 1 \ match$}
+\label{fig:data-count-03}
+\end{figure}
+
+The second pass will add an additional sixteen points in between the original nine, to create a 5x5 grid of 25 points around the target. 
+\begin{figure}[h]
+\includesvg{images/data-count-02.svg}
+\caption{$n=2 \ :\ ((2^n)+1)^2 = 5^2 = 25 \ points, 9 \ matches$}
+\label{fig:data-count-03}
+\end{figure}
+
+The third pass will add a further fifty six points to create a 9x9 grid of 81 points around the target. 
+\begin{figure}[h]
+\includesvg{images/data-count-03.svg}
+\caption{$n=3 \ :\ ((2^n)+1)^2 = 9^2 = 81 \ points, 29 \ matches$}
+\label{fig:data-count-03}
+\end{figure}
+
+The fourth pass adds another 208 points to create a 17x17 grid of 289 points around the target. 
+\begin{figure}[h]
+\includesvg{images/data-count-04.svg}
+\caption{$n=4 \ :\ ((2^n)+1)^2 = 17^2 = 289 \ points, 113 \ matches$}
+\label{fig:data-count-04}
+\end{figure}
+
+The new points added by each iteration are added in between the exiting points, keeping the maximum and minimum range the same. The result of adding more points increases the density of points around the target, which in turn increases the number of points within the search radius.
+
+The algorithm is designed to only adds the new points needed to extend the data set to the new size, it will avoid duplicating the existing points.
+This becomes more significant as the size of the data set grows. By the time the algorithm reaches the \textit{12th} and \textit{13th} iterations, avoiding duplicating the existing sixteen million points when updating the data set from sixteen million to sixty seven million points can save a significant amount of time.
+
+\begin{equation*}
+\begin{split}
+& n = 10\\
+& ((2^n)+1)^2 = 1025^2 = 1,050,625 \ points
+\\
+\\
+& n = 11\\
+& ((2^n)+1)^2 = 2050^2 = 4,198,401 \ points
+\\
+\\
+& n = 12\\
+& ((2^n)+1)^2 = 4097^2 = 16,785,409 \ points
+\\
+\\
+& n = 13\\
+& ((2^n)+1)^2 = 8193^2 = 67,125,249 \ points
+\end{split}
+\end{equation*}
 
 \subsection{Algorithm comparison}
 \label{database-algorithms}
+
+The tests were designed to run three different algorithms in the same test framework and compare their performance against a range of different data set sizes, search radii and zone heights.
+
+The test framework is implemented as a set of Java \junit tests, using an abstract \texttt{Matcher} interface for the \crossmatch components.
+Each of the \crossmatch algorithms is wrapped as a component that implements the  \texttt{Matcher} interface enabling it to be plugged in to the test framework.
+This component based design enables us to apply the same set of test conditions to each of the algorithms in turn, re-using the rest of the framework code each time.
+
+The test framework around this is split into two sets of nested loops, the outer data generation loops and the inner \crossmatch selection loops.
+
+The data generation and the \crossmatch tests are centred on a single target position for a test run, configured using \texttt{target.ra} and \texttt{target.dec} properties which set the right ascension (\textit{ra}) and declination (\textit{dec}) of the target position in degrees.
+
+The outer most loop of the data generation loops uses the \texttt{range.min} and \texttt{range.max} configuration properties to control the range of data values inserted into the database.
+\begin{itemize}
+    \item \texttt{range.min} sets the lower limit for the range of values.
+    \item \texttt{range.max} sets the upper limit for the range of values.
+\end{itemize}
+
+These properties configure the upper and lower values of the range exponent, \textit{m}, which is used to set the exponent of the range in each iteration using the equation \(range = 2^m\).
+
+The data range loop counts down from the upper limit to the lower limit, decreasing the spread and increasing the density of the test data with each iteration.
+
+Given the following configuration:
+
+\begin{lstlisting}
+    range.min = 0
+    range.max = 6
+\end{lstlisting}
+
+The range loop will step from \textit{m = 6} to  \textit{m = 0}, generating data sets spread over a range of 
+\(2^6\) (64),
+\(2^5\) (32),
+\(2^4\) (16),
+\(2^3\) (8),
+\(2^2\) (4),
+\(2^1\) (2)
+and
+\(2^0\) (1).
+
+In each case the max and min range properties only controls the spread of the data not the number of values.
+If we assume the total count of values is fixed at 25 points, and a target position of \textit{ra=0,dec=0}, then a range exponent of \textit{m=8} would generate 25 data points spread over a range of $\pm64$ centered around the target point, producing values for \textit{ra} of [-64...+64] and \textit{dec} of [-64...+64].
+
+\begin{lstlisting}
+    -64,-64 
+    -64,-32 
+    -64,0 
+    -64,32
+    -64,64 
+
+    -32,-64 
+    -32,-32 
+    -32,0 
+    -32,32 
+    -32,64 
+
+    0,-64 
+    0,-32 
+    0,0 
+    0,32 
+    0,64 
+
+    32,-64 
+    32,-32 
+    32,0 
+    32,32 
+    32,64 
+
+    64,-64 
+    64,-32 
+    64,0 
+    64,32 
+    64,64 
+\end{lstlisting}
+
+If we keep the total count and target position the same, then a data range exponent of \textit{m=3} would still generate 25 points but this time spread over a range of $\pm8$ centered around the target point, producing values for \textit{ra} of [-8..+8] and \textit{dec} of [-8..+8].
+
+\begin{lstlisting}
+    -8,-8 
+    -8,-4 
+    -8,0 
+    -8,4 
+    -8,8 
+
+    -4,-8 
+    -4,-4 
+    -4,0 
+    -4,4 
+    -4,8 
+
+    0,-8 
+    0,-4 
+    0,0
+    0,4 
+    0,8 
+
+    4,-8 
+    4,-4 
+    4,0 
+    4,4 
+    4,8 
+
+    8,-8 
+    8,-4 
+    8,0 
+    8,4 
+    8,8 
+\end{lstlisting}
+
+At the lowest level, a data range exponent of \textit{m=0} still generates 25 points, this time spread over a range of $\pm1$ centered around the target point, producing values for \textit{ra} of [-1..+1] and \textit{dec} of [-1...+1].
+
+\begin{lstlisting}
+    -1.0,-1.0 
+    -1.0,-0.5 
+    -1.0,0.0 
+    -1.0,0.5
+    -1.0,1.0 
+
+    -0.5,-1.0 
+    -0.5,-0.5 
+    -0.5,0.0 
+    -0.5,0.5 
+    -0.5,1.0 
+
+    0.0,-1.0 
+    0.0,-0.5 
+    0.0,0.0
+    0.0,0.5 
+    0.0,1.0 
+
+    0.5,-1.0 
+    0.5,-0.5 
+    0.5,0.0 
+    0.5,0.5 
+    0.5,1.0 
+
+    1.0,-1.0 
+    1.0,-0.5 
+    1.0,0.0 
+    1.0,0.5 
+    1.0,1.0 
+\end{lstlisting}
+
+By setting \texttt{range.min} to 0 and \texttt{range.max} to 6 starts with a sparse data set with the points spread over $\pm64$ degrees and steps down to a very dense data set with all of the points concentrated within $\pm1$ degrees of the target position.
+
+Figure \ref{fig:data-range-01} shows the effect of keeping the number of points the same while reducing the range increases the density of the points putting more of them within the search radius, ending up with all of the points within the search radius.
+
+\begin{figure}[h]
+\includesvg{images/data-range-01.svg}
+\caption{The effect of reducing range on density of points}
+\label{fig:data-range-01}
+\end{figure}
+
+
+As the size of the test data set grows, creating and indexing the data takes up more time than the \crossmatch tests themselves.
+Each iteration of the outer loop uses the test data generator described in Section \ref{test-data-generator} to add another layer of points to the test data and then calls the inner loop to run a series of \crossmatch tests.
+Splitting the functionality onto an inner and outer loop enables us to apply the \crossmatch tests to a series of progressively larger data sets without having to re-build the whole data set each time. 
+
+
+The \texttt{insert.max} property sets the upper limit of the data size exponent, \textit{n}. The data generator loop starts with \textit{n=0}, each iteration increases the size of the data set to contain \(((2^n)+1)^2\) points, up to the final value of \textit{n} set by \texttt{insert.max}.
+
+In order to save time during development and make the testing more efficient, the \texttt{select.min} property enables us to skip the \crossmatch tests for low values of \textit{n}. The data generator loop starts with \textit{n=0}, but the \crossmatch selection tests are only applied for values of \textit{n} above the lower limit set by \texttt{select.min}.
+
+\noindent Given the following configuration:
+
+\begin{lstlisting}
+    select.min = 10
+    insert.max = 12
+\end{lstlisting}
+
+The outer loop will step through the first eight iterations of the loop, \textit{n=0} to \textit{n=9}, adding points to the data set but not applying the \crossmatch tests. The \crossmatch tests are only applied for iterations above limit set by \texttt{select.min}; iterations \textit{n=10} (1,050,625 points), \textit{n=11} (4,198,401 points) and \textit{n=12} (16,785,409 points).
+
+
+
+
+
+The inner loop performs the cross match searches and collects the timing statistics for comparison. 
+
+The configuration for the inner loop enables us to change the following properties of the cross match queries:
+
+\begin{itemize}
+    \item The search radius.
+    \item The number of times the search is repeated.
+\end{itemize}
+
 
 The HTM tests used the Java library from JHU to calculate which triangles intersected the target region and then queried the database to find all the sources within those triangles.
 
@@ -757,13 +1039,13 @@ The final set of tests looked at the relationship between the size of the zones,
 \subsection{Summary of results}
 \label{crossmatch-summary}
 
-Based on the test results, this set of experiments have been able to demonstrate a cross match algorithm that is capable of meeting the target data rate of 1,000 alerts per second for catalog sizes of the order of 12 million sources. Further testing will be needed to demonstrate how this capability can be scaled to handle larger data sets.
+Based on the test results, this set of experiments have been able to demonstrate a \crossmatch algorithm that is capable of meeting the target data rate of 1,000 alerts per second for catalog sizes of the order of 12 million sources. Further testing will be needed to demonstrate how this capability can be scaled to handle larger data sets.
 
 There is more  that could be done to develop these experiments further, extending the size of the test data set, optimizing the indexing and exploring the relationship between zone size, search radius and search performance.
 
 There is also more work to do to explore ways to make the system scalable and fault tolerance.
 
-To meet the scalability and fault tolerance criteria we need to look at ways to distribute the crossmatch searches over multiple machines.
+To meet the scalability and fault tolerance criteria we need to look at ways to distribute the \crossmatch searches over multiple machines.
 
 There are two aspects to the scalability question:
 \begin{itemize}
@@ -1166,7 +1448,7 @@ By extending the \texttt{SolarSystemFilter} to add a switch that either includes
     \end{itemize}
 \end{itemize}
 
-\subsubsection{Cross-match example}
+\subsubsection{Crossmatch example}
 \label{workflow.cross-match}
 
 Section \ref{crossmatch-zones} describes the algorithms and indexing used in a set of experiments to look at a high speed \crossmatch for matching \texttt{Candidates} against a catalog of positions.
@@ -1193,7 +1475,7 @@ Each annotation contains an identifier and position for the \texttt{Candidate}, 
         }
 \end{lstlisting}
 
-We can extend the \texttt{Candidate} class, adding a list of cross matches, creating a new class, \texttt{AnnotatedCandidate}.
+We can extend the \texttt{Candidate} class, adding a list of \crossmatch matches, creating a new class, \texttt{AnnotatedCandidate}.
 
 \begin{lstlisting}[style=Java]
     interface AnnotatedCandidate extends Candidate
@@ -1205,7 +1487,7 @@ We can extend the \texttt{Candidate} class, adding a list of cross matches, crea
 We can use this to build a component that combines a \texttt{CatalogMatcher} that matches the candidates against a catalog and a \texttt{KafkaProducer} that send the results to a new stream.
 
 \begin{itemize}
-    \item A \texttt{CrossmatchComponent} that generates a new stream of cross-match annotated candidates :
+    \item A \texttt{CrossmatchComponent} that generates a new stream of \crossmatch annotated candidates :
     \begin{itemize}
         \item \texttt{CatalogMatcher} matches against a catalog and adds annotations.
     \end{itemize}
@@ -1214,7 +1496,7 @@ We can use this to build a component that combines a \texttt{CatalogMatcher} tha
     \end{itemize}
 \end{itemize}
 
-In most cases it does not make sense to cross match \texttt{Candidates} that have already been associated with know solar system objects, so we want to exclude the solar system objects from the cross-match processing.
+In most cases it does not make sense to \crossmatch \texttt{Candidates} that have already been associated with know solar system objects, so we want to exclude the solar system objects from the \crossmatch processing.
 
 One way to achieve this would be to use separate stream processing Components and connect them together using a \kafka stream, connecting the output from the \texttt{SolarSystemComponent} to the input of the \texttt{CrossmatchComponent}.
 
@@ -1229,7 +1511,7 @@ One way to achieve this would be to use separate stream processing Components an
 \end{itemize}
 
 \begin{itemize}
-    \item A \texttt{Component} that generates a new stream of cross-match annotated \texttt{Candidates}:
+    \item A \texttt{Component} that generates a new stream of \crossmatch annotated \texttt{Candidates}:
     \begin{itemize}
         \item \texttt{CatalogMatcher} matches against a catalog and adds annotations.
     \end{itemize}
@@ -1241,7 +1523,7 @@ One way to achieve this would be to use separate stream processing Components an
 Alternatively, we could combine the \texttt{SolarSystemFilter} and \texttt{CatalogMatcher} processors in the same \texttt{Component} linking them together by adding both of them to the same List of \texttt{Processors}.
 
 \begin{itemize}
-    \item A \texttt{Component} that generates a new stream of cross-match annotated \texttt{Candidates} that are \textbf{not} associated with solar system objects:
+    \item A \texttt{Component} that generates a new stream of \crossmatch annotated \texttt{Candidates} that are \textbf{not} associated with solar system objects:
     \begin{itemize}
         \item \texttt{SolarSystemFilter} configured to exclude any solar system object.
     \end{itemize}
@@ -1253,10 +1535,9 @@ Alternatively, we could combine the \texttt{SolarSystemFilter} and \texttt{Catal
     \end{itemize}
 \end{itemize}
 
-In this example, the resource cost of the \texttt{SolarSystemFilter} is so low, the combined solution is probably the most practical. The resource cost of publishing the non-solar-system results as a separate stream and reading them back in to to the cross match processor out-weighs the minimal cost of implementing the simple \texttt{SolarSystemFilter}.
+In this example, the resource cost of the \texttt{SolarSystemFilter} is so low, the combined solution is probably the most practical. The resource cost of publishing the non-solar-system results as a separate stream and reading them back in to to the \crossmatch processor out-weighs the minimal cost of implementing the simple \texttt{SolarSystemFilter}.
 
-In contrast, a \texttt{CrossmatchProcessor} for a large catalog requires a lot of resources to implement; significantly more resources than would be needed by an additional \kafka stream. So if we have multiple use cases that need to use the results of the cross-match, it would be better to do the cross-match calculation once and publish the results as a new stream of annotated Candidates. This new stream can then be used as the source stream for a range of different
-processors.
+In contrast, a \texttt{CrossmatchProcessor} for a large catalog requires a lot of resources to implement; significantly more resources than would be needed by an additional \kafka stream. So if we have multiple use cases that need to use the results of the \crossmatch, it would be better to do the \crossmatch calculation once and publish the results as a new stream of annotated Candidates. This new stream can then be used as the source stream for a range of different processors.
 
 In general, the cost/benefit of combining multiple \texttt{Processors} within a complex \texttt{Component}, or deploying them in separate \texttt{Components}, joining the output stream of one as the input to the next depends on the relative resource costs of performing the each of the processing steps compared to the resource cost of adding another Kafka stream.
 
@@ -1270,7 +1551,7 @@ In all probability, our use cases will need to use a combination of both methods
 Where we do need to use \kafka streams to link the input and outputs of \texttt{Components}, there are two options for deploying the \kafka services. 
 The first option is to simply add another stream to the existing \kafka service that is providing the \stageone input buffer. However, this may cause issues with resource contention for the physical network and disks.
 
-There will probably be a lot of \kafka clients subscribed to the output of the main \stageone \kafka buffer, and a similar number of clients will want to subscribe to the output of the main catalog cross match. Serving two heavily subscribed streams from the same logical \kafka service, served by the same set of physical \kafka servers, could cause resource contention (see section \ref{kafka-contention}).
+There will probably be a lot of \kafka clients subscribed to the output of the main \stageone \kafka buffer, and a similar number of clients will want to subscribe to the output of the main catalog \crossmatch. Serving two heavily subscribed streams from the same logical \kafka service, served by the same set of physical \kafka servers, could cause resource contention (see section \ref{kafka-contention}).
 
 In which case, it makes sense to use multiple separate \kafka services deployed on separate physical servers to provide the internal streams between the workflow \texttt{Components}.
 
@@ -1322,23 +1603,229 @@ As long as the lightweight platform uses the same \yaml syntax for the component
 
 The following sections report on lessons learned from our experience of working with \kafka during \phasea of the \lsstuk project.
 
-\subsection{Kafka offsets}
-\label{kafka-offsets}
+\subsection{Kafka data distribution}
+\label{kafka-data-distribution}
 
-A \kafka server stores data  for a stream as a sequential 
+A Kafka server stores data for a topic as a set of log files, one for each partition.
+The total number of log files is set by the number of partitions, multiplied by the replication factor set for that topic.
+If a topic has four partitions, and a replication factor of three, then the data will be spread across twelve files.
+If this topic is served by four servers, then each server will be allocated three of the twelve files.
 
+\begin{itemize}
+    \item server-s1
+    \begin{itemize}
+        \item partition-p1
+        \item partition-p2
+        \item partition-p3
+    \end{itemize}
+    \item server-s2
+    \begin{itemize}
+        \item partition-p1
+        \item partition-p2
+        \item partition-p4
+    \end{itemize}
+    \item server-s3
+    \begin{itemize}
+        \item partition-p1
+        \item partition-p3
+        \item partition-p4
+    \end{itemize}
+    \item server-s4
+    \begin{itemize}
+        \item partition-p2
+        \item partition-p3
+        \item partition-p4
+    \end{itemize}
+\end{itemize}
+
+I we loose one of the machines, server-s2 for example, then the system still has two copies of each of the three partition files that were on server-s2.
+
+\begin{itemize}
+    \item partition-p1 is on server-s1 and server-s3
+    \item partition-p2 is on server-s1 and server-s4
+    \item partition-p4 is on server-s3 and server-s4
+\end{itemize}
+
+If we replace server-2 with a new blank machine, then the three missing files will be re created using data from the other machines.
+
+This partitioning and duplication of the data is essential to the way that Kafka operates,
+and provides much of the performance and reliability benefits of Kafka.
+However, the same partitioning and duplication can also cause a number of
+side effects that we need to be aware of.
 
 
 \subsection{Kafka partitions}
 \label{kafka-partitions}
 
+One of the issues that needs to be considered for a Kafka deployment is the number of partitions that the data for a topic is split into.
+
+The number of partitions assigned to a topic directly influences
+the level of concurrency available to downstream processing nodes.
+
+Spreading data across partitions is not done by the services.
+The spread across partitions is performed by the upstream producer that writes
+the data to the service.
+
+When a client producer writes data to a service, it first requests
+the number of partitions assigned to the topic by querying the
+server to request the topic configuration.
+
+If we start with an example configuration of one producer connected to
+a set of four servers.
+
+If the topic that the producer is writing to is configured with only three partitions,
+then the producer will split the data into blocks and send them to one of three
+partitions in turn.
+
+The first block will be sent to partition one on the first server, the second block is sent to
+partition two on the second server, and the third block is sent to partition three on the third server.
+
+The fourth block is sent to partition one on the first server,
+the fifth to partition two on the second server and the sixth block to partition three on the the third server.
+
+In this simple configuration, with more servers than partitions, the fourth server
+does not have any partitions allocated to it.
+In reality, the replication factor would normally be greater than one, so internal
+replication would spread copies of the data between the four servers, including
+the fourth service.
+However, to simplify this example we are only tracking the primary copies for
+each partition and not the replicas.
+
+If we increase the partition count to four, then the partitions are spread
+evenly across all four servers.
+
+With five partitions, then three of the four servers would have one partition each,
+and one of the servers would have two partitions.
+
+As the number of partitions increases, the data is spread more evenly across the servers.
+
+With twenty five partitions, three of the four servers would have six
+partitions, and one of the servers would have seven partitions.
+
+With one hundred and twenty five partitions, three of the four servers would have thirty one
+partitions, and one of the servers would have thirty two partitions.
+
+
+With data being written into our service, we can now look at
+how the data is sent to downstream consumers.
+
+Starting with the first example, three partitions spread across four servers.
+If we have a single consumer, then data from all four partitions are sent to the
+same consumer.
+
+If we have two consumers, the first consumer would be sent data for one partition,
+and the second consumer would be sent data for two partitions.
+
+If we have three consumers, then each consumer handles data from one partion.
+
+If we have four consumers, then three of the consumers each handle data one partion,
+and the fourth consumer does not receive any data.
+
+Increasing the number of consumers beyond the number of partitions
+results in idle consumers with no data sent to them.
+
+This limits the level of concurrency that the downstream component can be configured with.
+With three partitions, then the system will only send data to three consumers.
+Adding more consumers running in parallel will not increase the data throughput.
+
+With twenty five partitions, we can add up to twenty five consumers running in parallel,
+and each consumer will receive data from one partition.
+
+With one hundred and twenty five partitions, we can add up to hundred and twenty five
+consumers running in parallel.
+
+The general rule is configuring a topic to have more partitions spreads the data more
+evenly accross the available resources.
+
+This is a dynamic process. If we add more servers to a live cluster, the servers in the cluster
+will automatically assign partions to the new joiners, balancing the partitions
+and replication between the available resources.
+
+Likewise adding more consumers to a consumer group, the servers will automatically assign
+partions to the new joiners, balancing the partitions between the consumers.
+
+If we have twenty five partitions and ten consumers, then five of the consumers will be sent
+data from three partitions, and five of the consumers will be sent data from two partitions.
+
+As we add more consumers to the group the servers will dynamically re-allocate
+partitions between the consumers.
+
+With eleven consumers, eight consumers will get data from two partitions and
+three will get data from three partitions.
+
+This works all the way up to twenty five consumers, each handling data from one partition.
+
+Adding a twenty sixth consumer will not spread the data from a partion between two
+consumers. So the twenty sixth consumer will not get any data.
+
+The general rule is splitting the data across more partitions in the service means it can be spread
+across more concurrent consumers downstream.
+The number of partitions in the service sets the upper limit on the number of concurrent
+consumers downstream.
+Having more consumers than partitions will result in consumers sitting idle with no data being sent to them.
+
+Note that the number of consumers in these examples equates to the number of concurrent threads.
+In terms of data partitioning, a single consumer process with four threads is the same as
+four consumers running one thread each.
+
+Talking about a hundred partitions sounds a lot, but consider if we use two of the LSST:UK test bed machines
+with 28 cpu cores each, with hyper-threading (https://en.wikipedia.org/wiki/Hyper-threading) enabled,
+that gives us a potential (28*2*2) = 112 concurrent threads.
+If we want to be able to dynamically add extra processing to the system in response to load, then
+adding a third machine would give us 168 threads, and a fourth machine would give us a total of 224
+concurrent threads.
+
+In order to be able to scale the system to this level, we would need to allocate enough partitions
+to be able to share the data across all 224 threads.
+
+However, there are costs associated with increasing the number of partitions.
+The primary cost of splitting the data across a large number of partitions is the amount of resources this consumes on the servers.
+
+If we consider the stage 1 top level FIFO buffer, there are likley to be several logical client processes
+receiving data from the same buffer topic.
+We may have three or four processors consuming data from the stream and performing catalog \crossmatch or
+watch list triggers.
+We may have a couple of processors consuming data from the stream and extracting the thumbnail images or light curves, and we may have a couple of processors consuming data from the stream and archiving it as Avro or Parquet files for downstream analysis tools.
+
+The way that Kafka is able to handle multiple processes consuming data at different rates is by appending the data to flat log files, one for each partition, and maintaining a separate offset pointer for each consumer.
+
+When a group of consumers subscribe to a topic, the servers assigns the available partitions to the members of the group, storing an offset pointer for each consumer for each partiton it is allocated.
+
+When a consumer requests a block of data, the server loads the next available block from one of the partions allocated to that consumer using the offset pointer for that consumer on that partition.
+The server loads the data into a buffer in memory, sends it to the consumer and waits for an acknowledgment.
+When it receives an acknowledgment from the consumer, the server increments the offset pointer for that consumer on that partition and then loads the next block of data to send
+
+If we allocate separate consumer processes to each watch list, \crossmatch, filter or characterization process, then our stage 1 FIFO buffer may have a hundred processes subscribed to read data from the topic.
+
+Each of these logical processes consists of a group of concurrent consumer processes running on one or more of the worker nodes.
+
+Irrespective of how many concurrent threads they are running, each consumer group will need to allocate
+a consumer connection to each partition.
+
+A hundred consumer groups means a hundred connections to each partition.
+
+If we distribute our data across 224 partitions, then our server machine has to handle 224 partitions, with 100 connections to each partition, each connection needing a buffer for the data, an offset counter and an open file descriptor to read the data.
+
+
+The second cost of splitting the data across a large number of partitions is the amount of resources this consumes on the client.
+If we have 224 partitions and 224 consumer threads, then in theory each consumer should only need to handle data for one partition, or 1/224 of the data.
+
+However, the way that the connection process works means there is a race condition at the start of the process.
+The first consumer to subscribe to a topic is allocated all of the partitions for that topic.
+When the second consumer subscribes, half of the partitions are re-allocated to the new joiner.
+When the third consumer subscribes, a third of the partitions are re-allocated to the new joiner, and so on.
+
+The problem is that at the start of the process when there are only a few consumers subscribed to the topic,
+they have to share all of the partitions between them. Worst case is the short period when only one
+consumer is subscribed, it has to handle network connections and data buffers for all 244 topics.
+
+
+
 \subsection{Kafka  archive}
 \label{kafka-archive}
 
-\subsection{Data archive}
+\subsection{Resource contention}
 \label{kafka-contention}
-
-
 
 \subsection{Avro schema}
 \label{avro-schema}
@@ -1352,7 +1839,16 @@ A \kafka server stores data  for a stream as a sequential
 \subsubsection{Schema registry}
 \label{avro-schema.registry}
 
+\subsection{Reliable clouds}
+\label{reliable-clouds}
+
+There is a well worn joke in the IT world along the lines of \textit{"the cloud means other people's computers"}. So well worn, re-quoted and conflicted that I can't find an original source to cite or to quote directly.
+However, the problems we encountered with the \eleanor \openstack deployments brought this into focus for us.
+
+\subsubsection{The new operating system}
+\label{the-new-operating-system}
 
 
+\printbibliography
 
 \end{document}
