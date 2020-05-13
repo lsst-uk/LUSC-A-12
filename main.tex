@@ -61,6 +61,7 @@
 
 \newcommand{\paas} {PaaS\xspace}
 \newcommand{\datacenter} {datacenter\xspace}
+\newcommand{\webservice} {webservice\xspace}
 
 \newcommand{\redhat} {RedHat\xspace}
 \newcommand{\fedora} {Fedora\xspace}
@@ -102,6 +103,15 @@
 
 \newcommand{\mirrormaker} {Mirror Maker\xspace}
 \newcommand{\schemaregistry} {Schema Registry\xspace}
+
+\newcommand{\serz}      {serialize\xspace}
+\newcommand{\serzed}    {serialized\xspace}
+\newcommand{\serzer}    {serializer\xspace}
+\newcommand{\serzers}   {serializers\xspace}
+\newcommand{\deserz}    {deserialize\xspace}
+\newcommand{\deserzed}  {deserialized\xspace}
+\newcommand{\deserzer}  {deserializer\xspace}
+\newcommand{\deserzers} {deserializers\xspace}
 
 \newcommand{\phasea} {phase A\xspace}
 \newcommand{\phaseb} {phase B\xspace}
@@ -293,7 +303,7 @@ Deploying a buffer at the input to our system give us direct control over the nu
 \label{stage-1.schema-mapping}
 The ZTF and LSST alert messages are encoded using the \apache\avro\footurl{https://avro.apache.org/} binary encoding format. 
 
-In addition to the binary message content, the current live stream from \ztf uses an inline schema to describe the message schema. Every message carries a copy of its schema embedded in the message header serialized as a plain text \json\footurl{https://www.json.org/} document.
+In addition to the binary message content, the current live stream from \ztf uses an inline schema to describe the message schema. Every message carries a copy of its schema embedded in the message header \serzed as a plain text \json\footurl{https://www.json.org/} document.
 This means the alert messages are self-describing, and provides some insulation from side effects of schema changes for clients.
 However, embedding the schema in every message adds a non-trivial overhead, particularly if the stream only contains a small number of well known message types.
 
@@ -389,7 +399,7 @@ While the low speed components don't need to be able to match the peak bandwidth
 \subsubsection{Component libraries}
 \label{stage-2.component-libraries}
 
-In order to help develop these processors and filters we should provide a set of Java and Python libraries that implement the support functionality needed to connect to \kafka services, subscribe to topics, read and write messages, serialize and deserialize \avro messages etc.
+In order to help develop these processors and filters we should provide a set of Java and Python libraries that implement the support functionality needed to connect to \kafka services, subscribe to topics, read and write messages, \serz and \deserz \avro messages etc.
 
 Using a common set of well tested libraries will help to make our own components easier to develop and more reliable to use. It will also help to lower the barrier to entry for 3rd party developers to create their own processors and filters.
 
@@ -1128,7 +1138,7 @@ The meaning of the result codes are :
 \subsubsection{Component}
 \label{java-interfaces.Component}
 
-The framework also provides a template implementation of a component that can connect to a Kafka service, subscribed to a topic, read alert messages from the topic, deserialized them into Java objects and passes each \texttt{Candidate} object to a \texttt{process()} method.
+The framework also provides a template implementation of a component that can connect to a Kafka service, subscribed to a topic, read alert messages from the topic, \deserz them into Java objects and passes each \texttt{Candidate} object to a \texttt{process()} method.
 
 \begin{lstlisting}[style=Java]
     /**
@@ -1701,29 +1711,112 @@ There are three main patterns used to share information about the message schema
 
 The simplest method is to fix the message schema beforehand, and give both \kfproducer and \kfconsumer a static copy of the schema.  In this scheme, the binary messages are transmitted as-is, without any additional metadata about the schema used to encode the content.
 
+This works for simple test systems, but it is inherently fragile and will break the first time that we add a new  \kfproducer that uses a slightly different schema.
+
 There is enough built-in error checking the \avro serialization encoding for a client to be able to validate a message against a message schema. However the validation process costs a lot in compute time and resources, and in the end all it can give you is an error that indicates the message does not match the expected schema. It can't tell you anything more about what the message does contain.
 
 In reality, systems that use a static shared schema rely on an external process to ensure the \kfproducer and \kfconsumer use the correct schema, and don't bother to validate incoming messages because of the cost in processing time.
 
-This works for simple test systems, but it is inherently fragile and will break the first time that we add a new  \kfproducer that uses a slightly different schema.
-
-
 \subsubsection{In-line schema}
 \label{avro-inline-schema}
 
-At the other end of the spectrum is 
+An alternative method is to embed the schema into the header for each message.
+In this format, every message carries a copy of its schema serialized as a plain text \json\footurl{https://www.json.org/} document.
 
+This means that the messages are self-describing. A client does not need to know about the message schema beforehand, it can use the embedded schema to \deserz a message into a generic self-describing structure when it arrives.
 
-
-
-
-
-
-
-
-In addition to the binary message content, the current live stream from \ztf uses an inline schema to describe the message schema. Every message carries a copy of its schema embedded in the message header serialized as a plain text \json\footurl{https://www.json.org/} document.
-This means the alert messages are self-describing, and provides some insulation from side effects of schema changes for clients.
 However, embedding the schema in every message adds a non-trivial overhead, particularly if the stream only contains a small number of well known message types.
+Firstly, in order to be readable by any client, the schema has to be transmitted as plain text. This adds a small overhead to the number of bytes that need to be transmitted for every message.
+
+In the current ZTF stream, every message needs to have a copy of the following four schema files:
+
+\begin{itemize}
+  \item alert.avsc (1094 bytes)
+  \item candidate.avsc (14784 bytes)
+  \item cutout.avsc (236 bytes)
+  \item prv candidate.avsc (6565 bytes)
+\end{itemize}
+
+This adds an overhead of 22679 bytes to every message. Scale that up to the ~1kHz to 10kHz data rate expected from LSST and this represents a continuous load of ~20 bytes to ~200 Mbytes per second to re-transmit information the client already knows.
+
+Secondly, sending the schema with the message means the message is self describing, but it also means that the client is encountering the message structure for the first time every time it receives a new message.
+The client is unable to apply any form of optimisation to the decoding process, it has to \deserz the message into a generic object structure that is both inefficient to construct and inefficient to use.
+
+The current ZTF message handling uses both of these methods.
+The upstream ZTF broker is sending a full copy of the schema in the header of every message, but the client software is ignoring this and using a compiled \deserzer built from a static copy of the schema embedded in the client source code, which means the client software will fail when it encounters changes in the message structure.
+
+\subsubsection{Schema registry}
+\label{avro-schema-registry}
+
+The third option is to use an external registry to associate the message schema with a simple identifier based on a fingerprint hash of the schema content. This identifier is sent in the message header, replacing the full schema with a simple numeric value.
+
+The client software starts out with a set of compiled \deserzers for known message structures.
+These \deserzers are built at compile time from static copies of the schema and can be optimised to generate fully qualified object classes that directly represent the message structure.
+
+If the upstream message \kfproducer introduces a new type of message, one that is not in the client's library of schema, then the client can detect this and has the option to take action to fix the problem.
+
+\confluent have defined a REST \webservice interface for a schema registration service \footurl{https://www.confluent.io/confluent-schema-registry/} that allows \kfproducers to upload and register their message schema and get a numeric identifier.
+If a \kfproducer uses a schema registry to generate the identifier sent in the message header, and the client \kfconsumer is configured to use the same registry service, then the \kfconsumer can use the registry to resolve the identifier and download a copy of the schema.
+The \kfconsumer can use this downloaded schema to create a generic \deserzer that can cope with the new message structure.
+This \deserzer will not be as efficient as the compiled \deserzers used for known schema, but it gives the client the option of being able to handle new message types without having to ship a full copy of the schema with each message.
+
+This scheme works well to create flexible \kfconsumers that can handle any message structure and is used extensively by the \confluent tools and services like the \confluent Connect\footurl{https://docs.confluent.io/current/connect/index.html} components used in the \confluent Platform\footurl{https://www.confluent.io/product/confluent-platform}.
+
+The schema registration service is designed to manage all the schema for an entire organisation, including support for deploying a distributed registry service that functions across more than one data center.
+
+However, on its own it does not work as well for managing schema across multiple organisations.
+The first problem is that the schema identifier is just a single 32bit integer, assigned by the central registry service for the organisation. This identifier is guaranteed to be be unique within the host organisation, but as far as we know there is no way of extending this to span multiple organisations.
+The second problem is that the message header only contains the 32bit numeric identifier, it does not contain any information about which registry service to use to resolve this identifier.
+The scheme relies on the \kfproducers and \kfconsumers within an organisation all being configured with the endpoint address of the \schemaregistry they should use to register and resolve schema and schema identifiers.
+
+Putting these two issues together means that within an organisation \kfproducers and \kfconsumers can use this system to exchange messages with flexible message schema. However, the scheme does not scale to be able to register and resolve schema and schema identifiers across separate organisations.
+
+For example, within a single organisation all of the \kfproducers and \kfconsumers are configured to use a single central \schemaregistry by setting the endpoint URL \texttt{http://registry.example.org/}.
+When a \kfproducer starts to send messages it first checks the registry to see if the schema it is going to use has been registered. If the schema has not been registered yet the \kfproducer uploads a \json encoded copy of the schema and in return receives a new unique identifier for the schema, e.g. 27.
+
+The first time a \kfconsumer receives a message with schema identifier 27 in the header it can use the \schemaregistry to resolve this identifier into a \json encoded copy of the schema and use that to generate a \deserzer to handle the new  message structure.
+This works because both the \kfproducer and \kfconsumer have been configured to use the same \schemaregistry endpoint address to register and resolve schema.
+
+However if the \kfproducer and \kfconsumer are in different organisations, then when the \kfconsumer receives a message with schema identifier 27 in the header it has no way of discovering which \schemaregistry it should use to resolve the identifier and get a copy of the original schema.
+
+The \confluent system does support deploying a distributed \schemaregistry across multiple physical data centers\footurl{https://docs.confluent.io/current/schema-registry/multidc.html}, by configuring one \schemaregistry as the primary registry and the other registries as secondary or slave registries.
+The secondary or slave registries pass new schema back to the primary registry for registration, centralising the  generation of identifiers and ensuring they remain unique within the organisation.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 Our understanding is that the \lsst project intend to use a service like the \schemaregistry\footurl{https://www.confluent.io/confluent-schema-registry/} to manage their \avro schema, and each message will only include a schema identifier rather than the full schema. This reduces the overhead associated with using an inline schema to describe the messages. However, the schema identifier will be specific to the upstream project's \schemaregistry. This means we will need to provide a mapping from their schema identifiers to the corresponding schema identifiers in our own local \schemaregistry.
 This translation can be handled by the input buffer, replacing the upstream schema identifier with the the corresponding local identifier as it receives the messages.
