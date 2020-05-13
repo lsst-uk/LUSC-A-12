@@ -67,11 +67,24 @@
 
 \newcommand{\github} {GitHub\xspace}
 
-\newcommand{\apache} {Apache\xspace}
 \newcommand{\kafka} {Kafka\xspace}
 \newcommand{\flink} {Flink\xspace}
 \newcommand{\spark} {Spark\xspace}
 \newcommand{\cassandra} {Cassandra\xspace}
+\newcommand{\zookeeper} {Zookeeper\xspace}
+
+\newcommand{\kfbroker} {\textit{broker}\xspace}
+\newcommand{\kfconsumer} {\textit{consumer}\xspace}
+\newcommand{\kfconsumers} {\textit{consumers}\xspace}
+\newcommand{\kfproducer} {\textit{producer}\xspace}
+\newcommand{\kfproducers} {\textit{producers}\xspace}
+\newcommand{\kfpublisher} {\textit{publisher}\xspace}
+\newcommand{\kfpublishers} {\textit{publishers}\xspace}
+\newcommand{\kfsubscriber} {\textit{subscriber}\xspace}
+\newcommand{\kfsubscribers} {\textit{subscribers}\xspace}
+
+\newcommand{\apache} {Apache\xspace}
+\newcommand{\confluent} {Confluent\xspace}
 
 \newcommand{\kubernetes} {Kubernetes\xspace}
 \newcommand{\virtualbox} {VirtualBox\xspace}
@@ -278,13 +291,13 @@ Deploying a buffer at the input to our system give us direct control over the nu
 
 \subsubsection{Schema mapping}
 \label{stage-1.schema-mapping}
-The ZTF and LSST alert messages are encoded using the \apache\avro\footurl{https://avro.apache.org/} binary data serialization format. However, the data schema for the message content is serialized as a plain text \json\footurl{https://www.json.org/} document.
+The ZTF and LSST alert messages are encoded using the \apache\avro\footurl{https://avro.apache.org/} binary encoding format. 
 
-The current stream from \ztf uses an inline schema to describe each message. Every message carries a copy of its schema embedded in it.
+In addition to the binary message content, the current live stream from \ztf uses an inline schema to describe the message schema. Every message carries a copy of its schema embedded in the message header serialized as a plain text \json\footurl{https://www.json.org/} document.
 This means the alert messages are self-describing, and provides some insulation from side effects of schema changes for clients.
 However, embedding the schema in every message adds a non-trivial overhead, particularly if the stream only contains a small number of well known message types.
 
-Our understanding is that the \lsst project intend to use a \schemaregistry\footurl{https://www.confluent.io/confluent-schema-registry/} to manage their \avro schema, and each message will only include a schema identifier rather than the full schema. This reduces the overhead associated with using an inline schema to describe the messages. However, the schema identifier will be specific to the upstream project's \schemaregistry. This means we will need to provide a mapping from their schema identifiers to the corresponding schema identifiers in our own local \schemaregistry.
+Our understanding is that the \lsst project intend to use a service like the \schemaregistry\footurl{https://www.confluent.io/confluent-schema-registry/} to manage their \avro schema, and each message will only include a schema identifier rather than the full schema. This reduces the overhead associated with using an inline schema to describe the messages. However, the schema identifier will be specific to the upstream project's \schemaregistry. This means we will need to provide a mapping from their schema identifiers to the corresponding schema identifiers in our own local \schemaregistry.
 This translation can be handled by the input buffer, replacing the upstream schema identifier with the the corresponding local identifier as it receives the messages.
 
 \subsubsection{Topic merge}
@@ -1603,10 +1616,152 @@ As long as the lightweight platform uses the same \yaml syntax for the component
 
 The following sections report on lessons learned from our experience of working with \kafka during \phasea of the \lsstuk project.
 
-\subsection{Kafka data distribution}
-\label{kafka-data-distribution}
+\subsection{Kafka introduction}
+\label{kafka-introduction}
 
-A Kafka server stores data for a topic as a set of log files, one for each partition.
+\kafka was designed as a reliable publish/subscribe message distribution service for sequential streams of data.
+
+When describing \kafka systems we often refer to three components, a \kfproducer which produces messages, a \kfconsumer that consumes messages and a \kfbroker that acts as the store and forward delivery system, accepting messages from producers and delivering messages to consumers.
+
+\kafka itself is the part in the middle, the broker that provides the message delivery system.
+The \kfproducer and \kfconsumer are clients, external and separate from the \kafka service.
+
+The \kafka \kfbroker does not know where the messages come from, or what happens to them after they are delivered.
+The \kafka \kfbroker concentrates purely on listening for messages from the producers, storing them in a buffer and then forwarding them on to consumer.
+
+    {P} -> [broker] -> {C}
+
+\subsection{Publish-subscribe pattern}
+\label{kafka-pubsub-pattern}
+
+This separation between the delivery system and the message producing and consuming clients is described as the 
+publish-subscribe pattern \footurl{https://en.wikipedia.org/wiki/Publish-subscribe_pattern}.
+
+In terms of system architecture, the publishing component of the publish-subscribe pattern is referred to as a \kfpublisher, or in \kafka terms, a \kfproducer.
+
+   {Pub} -> [broker]
+
+In the publish-subscribe pattern, a \kfpublisher does not send messages to a specific destination, instead messages are tagged as belonging to a topic and sent to a delivery service or \kfbroker. Clients who wish to receive messages contact the broker and subscribe to a topic. The broker will then pass on messages it receives that have been tagged as belonging to that topic.
+
+The choice of which messages belong to which topics is made by the \kfpublisher when they assign specific messages to specific topics. The broker does not read, interpret or filter the messages. It just passes messages on to the \kfsubscribers based on topic the messages have been tagged with. 
+
+In terms of system architecture, the subscribing component is referred to as a \kfsubscriber, or in \kafka terms, a \kfconsumer.
+
+   [broker] -> {Sub}
+
+The \kfbroker bridges the gap between \kfpublisher and \kfsubscriber, passing on messages based on the topic they are tagged with.
+
+   {Pub} -> [broker] -> {Sub}
+
+The \kfbroker provides an abstract interface between \kfpublisher and \kfsubscriber, insulating them from each other. A \kfpublisher does not need to know anything about the \kfsubscribers, how many there are, where they are or what they do with the messages. Likewise, a \kfsubscriber does not need to know anything about the \kfpublishers, they just receives messages from the broker. 
+
+In addition, the storage buffer in the broker can provide a separation in time between the publish and subscribe actions. The \kfpublisher may have already completed its task and finished executing by the time a \kfsubscriber connects to the broker and reads the messages sent by the \kfpublisher. 
+
+\subsection{Producers and consumers}
+\label{kafka-producer-consumer}
+
+At the software architecture level, a message \kfpublisher is called a \kfproducer in \kafka terminology, and a message \kfsubscriber is called a \kfconsumer in \kafka terminology.
+
+At the software implementation level, a message \kfpublisher, or \kafka \kfproducer, uses a connector class from the \kafka client library to send messages to a \kafka broker.
+Unfortunately the class in the client library that sends messages to a broker is also called a \texttt{producer}. So in terms of what is in the source code, a message \kfpublisher sends its messages by calling the write method of a \kafka \texttt{producer}.
+This quirk of naming can cause some confusion when talking about \kfproducers and \kfconsumers with people who are not familiar with the \kafka terminology.
+It is important to keep in mind that the class in the client library is not a \kfproducer, it does not produce messages, it is just a connector. The whole message generating component is the \kfproducer, which makes use of a connector from the \kafka client library to send messages to a broker.
+
+   {P(p)} -> [broker]
+
+Similarly, on the receiving side, a message \kfsubscriber, or \kafka \kfconsumer, uses a connector class from the \kafka client library to receive messages from a \kafka broker.
+The class in the client library that reads messages from a broker is called a \texttt{consumer}. So in terms of what is in the source code, the message \kfsubscriber receives messages by calling the read method of a \kafka \texttt{consumer}.
+Again, it is important to keep in mind that the class in the client library is not a \kfconsumer, it is just a connector. The whole message handling component is the \kfconsumer, making use of a connector class from the \kafka client library to receive messages from a broker.
+
+   [broker] -> {(c)C}
+
+\subsection{Message encoding}
+\label{kafka-encoding}
+
+As far as the \kafka service is concerned, the content of the messages is opaque. The \kafka service does not look at the content of messages, it just delivers them.
+
+The actual messages themselves are handled as arrays of bytes, regardless of their content.
+It is fairly common pattern to use the 
+\avro serialization format to encode messages handled by \kafka.
+There are strong links between the \kafka and \avro development 
+communities and developers from \confluent contribute to the development of both projects.
+However using one does not require the use of the other.
+\avro is a binary serialization encoding that is used by many different applications.
+\kafka is a publish-subscribe message broker that handles messages in any format, irrespective of how the message content is encoded.
+
+\subsection{Avro schema}
+\label{avro-schema}
+
+Using \avro to encode the message content requires the \kfpublisher and \kfsubscriber to share information about the message schema to enable the recipient to decode the binary bytes back into usable message content.
+
+There are three main patterns used to share information about the message schema between \kfproducer and \kfconsumer.
+
+\subsubsection{Static shared schema}
+\label{avro-static-schema}
+
+The simplest method is to fix the message schema beforehand, and give both \kfproducer and \kfconsumer a static copy of the schema.  In this scheme, the binary messages are transmitted as-is, without any additional metadata about the schema used to encode the content.
+
+There is enough built-in error checking the \avro serialization encoding for a client to be able to validate a message against a message schema. However the validation process costs a lot in compute time and resources, and in the end all it can give you is an error that indicates the message does not match the expected schema. It can't tell you anything more about what the message does contain.
+
+In reality, systems that use a static shared schema rely on an external process to ensure the \kfproducer and \kfconsumer use the correct schema, and don't bother to validate incoming messages because of the cost in processing time.
+
+This works for simple test systems, but it is inherently fragile and will break the first time that we add a new  \kfproducer that uses a slightly different schema.
+
+
+\subsubsection{In-line schema}
+\label{avro-inline-schema}
+
+At the other end of the spectrum is 
+
+
+
+
+
+
+
+
+
+In addition to the binary message content, the current live stream from \ztf uses an inline schema to describe the message schema. Every message carries a copy of its schema embedded in the message header serialized as a plain text \json\footurl{https://www.json.org/} document.
+This means the alert messages are self-describing, and provides some insulation from side effects of schema changes for clients.
+However, embedding the schema in every message adds a non-trivial overhead, particularly if the stream only contains a small number of well known message types.
+
+Our understanding is that the \lsst project intend to use a service like the \schemaregistry\footurl{https://www.confluent.io/confluent-schema-registry/} to manage their \avro schema, and each message will only include a schema identifier rather than the full schema. This reduces the overhead associated with using an inline schema to describe the messages. However, the schema identifier will be specific to the upstream project's \schemaregistry. This means we will need to provide a mapping from their schema identifiers to the corresponding schema identifiers in our own local \schemaregistry.
+This translation can be handled by the input buffer, replacing the upstream schema identifier with the the corresponding local identifier as it receives the messages.
+
+
+
+
+
+
+
+
+\subsection{Zookeeper role}
+\label{kafka-zookeeper}
+
+The \kafka 'service', or broker, consists of one or more \kafka servers working together to provide the 
+publish/subscribe message distribution service.
+
+using a \zookeeper service to coordinate their activity.
+
+It often looks like the \zookeeper service is managing or coordinating 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Kafka data storage}
+\label{kafka-data-storage}
+
+A \kafka server stores data for a topic as a set of log files, one for each partition.
 The total number of log files is set by the number of partitions, multiplied by the replication factor set for that topic.
 If a topic has four partitions, and a replication factor of three, then the data will be spread across twelve files.
 If this topic is served by four servers, then each server will be allocated three of the twelve files.
@@ -1827,8 +1982,6 @@ consumer is subscribed, it has to handle network connections and data buffers fo
 \subsection{Resource contention}
 \label{kafka-contention}
 
-\subsection{Avro schema}
-\label{avro-schema}
 
 \subsubsection{Static schema}
 \label{avro-schema.static}
@@ -1839,11 +1992,12 @@ consumer is subscribed, it has to handle network connections and data buffers fo
 \subsubsection{Schema registry}
 \label{avro-schema.registry}
 
+\schemaregistry\footurl{https://www.confluent.io/confluent-schema-registry/}
+
 \subsection{Reliable clouds}
 \label{reliable-clouds}
 
-There is a well worn joke in the IT world along the lines of \textit{"the cloud means other people's computers"}. So well worn, re-quoted and conflicted that I can't find an original source to cite or to quote directly.
-However, the problems we encountered with the \eleanor \openstack deployments brought this into focus for us.
+There is a often quoted joke in the IT world along the lines of \textit{"the cloud means other people's computers"}. The problems we encountered with the \eleanor \openstack deployments brought this into focus for us.
 
 \subsubsection{The new operating system}
 \label{the-new-operating-system}
