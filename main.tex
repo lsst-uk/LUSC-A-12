@@ -7,6 +7,7 @@
 
 \usepackage{svg}
 \usepackage{amsmath} 
+\usepackage{tabulary} 
 
 \title{LUSC-A-12 LSST:UK phase A alert handling and cross match experiments}
 \author{D. Morris}
@@ -1760,7 +1761,7 @@ If a \kfproducer uses a schema registry to generate the identifier sent in the m
 The \kfconsumer can use this downloaded schema to create a generic \deserzer that can cope with the new message structure.
 This \deserzer will not be as efficient as the compiled \deserzers used for known schema, but it gives the client the option of being able to handle new message types without having to ship a full copy of the schema with each message.
 
-This scheme works well to create flexible \kfconsumers that can handle any message structure and is used extensively by the \confluent tools and services like the \confluent Connect\footurl{https://docs.confluent.io/current/connect/index.html} components used in the \confluent Platform\footurl{https://www.confluent.io/product/confluent-platform}.
+This scheme works well to create flexible \kfconsumers that can handle any message structure and is used extensively by the \confluent tools and services like the \confluent Connect \footurl{https://docs.confluent.io/current/connect/index.html} components and the the \confluent Platform \footurl{https://www.confluent.io/product/confluent-platform} components.
 
 The schema registration service is designed to manage all the schema for an entire organisation, including support for deploying a distributed registry service that functions across more than one data center.
 
@@ -1782,6 +1783,55 @@ However if the \kfproducer and \kfconsumer are in different organisations, then 
 The \confluent system does support deploying a distributed \schemaregistry across multiple physical data centers\footurl{https://docs.confluent.io/current/schema-registry/multidc.html}, by configuring one \schemaregistry as the primary registry and the other registries as secondary or slave registries.
 The secondary or slave registries pass new schema back to the primary registry for registration, centralising the  generation of identifiers and ensuring they remain unique within the organisation.
 
+The requirement for the secondary or slave registries pass new schema back to the primary registry for registration means that while this model may work for multiple (\textasciitilde 10) data centers within an organization, it is unlikely to scale to include a multi-level hierarchy of (\textasciitilde 100) different organizations within the astronomy domain.
+If all of the secondary registries are required to register their schema with the top level primary registry, then the \lsst project would become the de facto central \schemaregistry for the entire astronomy domain, which is a responsibility are unlikely to want to take on. 
+
+At the time of writing, the \lsst project had not decided on what methods they would eventually adopt for managing version control for their message schema. However a number of their design documents refer to the \confluent \schemaregistry as a possible solution.
+
+\begin{quote}
+\textit{“The LSST Project will make available a registry of all alert schemas ever used operationally by LSST. Schemas may be retrieved from this registry by some convenient interface given a four-byte schema ID. Conceptually, this is equivalent to the Confluent Schema Registry, although it is possible an alternative implementation will be deployed in practice."} \footurl{https://dmtn-093.lsst.io/#management-and-evolution}
+\end{quote}
+
+\begin{quote}
+\textit{“... we have not committed on a particular mechanism for distributing the alert format and making changes to it. One option is the Confluent Schema Registry [1]; choosing this option may have implications on the deserialization performance of consumers.”} \footurl{https://dmtn-149.lsst.io/#alert-format}
+\end{quote}
+
+\subsubsection{Gateway broker}
+\label{avro-schema-gateway}
+
+If the \lsst project do adopt the \confluent \schemaregistry to register their alert schema, then the \lsstuk project will need to develop a similar mechanism for managing version control of message schema within the \lsstuk project.
+
+The following proposal outlines the design for a gateway \kfbroker that would handle the mapping between schema identifiers from the upstream \lsst \schemaregistry and schema identifiers in the local \lsstuk \schemaregistry.
+
+The first part of the solution is to deploy a local instance of the \confluent \schemaregistry which would be responsible for managing all the schema versions within the \lsstuk organization.
+
+We would then need to create a mapping between schema identifiers in messages from from the upstream \lsst \kfbroker and the corresponding schema identifiers in our own \schemaregistry.
+
+This could be handled by deploying a gateway \kfbroker, a modified form of the mirror maker service that translates schema identifiers on the fly as it imported messages from the upstream \lsst \kfbroker into the \lsstuk system.
+
+If the \lsst project do decide to use the \confluent \schemaregistry to manage schema versions, then their messages will be transmitted on the wire using the \confluent wire format.\footurl{https://docs.confluent.io/current/schema-registry/serdes-develop/index.html#wire-format}
+
+This consists of a single byte to represent the serialization format version (zero in the current version), followed by four bytes for the schema identifier and then the rest of the message body.
+
+\begin{table}[h]
+\begin{tabulary}{\linewidth}{|L|L|L|}
+\hline
+\textit{Byte} & \textit{Field} & \textit{Description} \\
+\hline
+0 & Magic Byte & Confluent serialization format version number; currently always 0. \\
+\hline
+1-4 & Schema ID & Four byte schema ID from the \schemaregistry. \\
+\hline
+5+ & Data & Serialized data for the specified schema format (e.g. binary encoding for Avro or Protocol Buffers). \\
+\hline
+\end{tabulary}
+\end{table}
+
+The \lsstuk gateway \kfbroker would maintain a mapping between schema identifiers from the upstream \lsst \kfbroker and the internal \lsstuk \schemaregistry.
+The gateway \kfbroker would read the four byte schema identifier from each message and check for a corresponding schema in the local \schemaregistry. If it did not find a matching schema then it would call the upstream \schemaregistry to resolve the schema identifier, download a \json encoded copy of the schema and then register the new schema in the local \schemaregistry. This would generate a new identifier, valid for the local domain.
+The gateway \kfbroker can then replace the four byte schema identifier in each message from the upstream \kfbroker with the corresponding local identifier from the local \schemaregistry before it passes the message on to the \lsstuk \kfbroker system.
+
+Using a gateway \kfbroker like this enables the \lsstuk project to maintain an internal \schemaregistry which provides version control for all of the message schema used within the \lsstuk system. This would include copies of schema published by the upstream \kfbroker and the internal schema generated by dynamic database queries and filtering components within the \lsstuk system.
 
 
 
@@ -1797,46 +1847,6 @@ The secondary or slave registries pass new schema back to the primary registry f
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Our understanding is that the \lsst project intend to use a service like the \schemaregistry\footurl{https://www.confluent.io/confluent-schema-registry/} to manage their \avro schema, and each message will only include a schema identifier rather than the full schema. This reduces the overhead associated with using an inline schema to describe the messages. However, the schema identifier will be specific to the upstream project's \schemaregistry. This means we will need to provide a mapping from their schema identifiers to the corresponding schema identifiers in our own local \schemaregistry.
-This translation can be handled by the input buffer, replacing the upstream schema identifier with the the corresponding local identifier as it receives the messages.
-
-
-
-
-
-
-
-
-\subsection{Zookeeper role}
-\label{kafka-zookeeper}
-
-The \kafka 'service', or broker, consists of one or more \kafka servers working together to provide the 
-publish/subscribe message distribution service.
-
-using a \zookeeper service to coordinate their activity.
-
-It often looks like the \zookeeper service is managing or coordinating 
 
 
 
@@ -2054,7 +2064,6 @@ A hundred consumer groups means a hundred connections to each partition.
 
 If we distribute our data across 224 partitions, then our server machine has to handle 224 partitions, with 100 connections to each partition, each connection needing a buffer for the data, an offset counter and an open file descriptor to read the data.
 
-
 The second cost of splitting the data across a large number of partitions is the amount of resources this consumes on the client.
 If we have 224 partitions and 224 consumer threads, then in theory each consumer should only need to handle data for one partition, or 1/224 of the data.
 
@@ -2067,33 +2076,8 @@ The problem is that at the start of the process when there are only a few consum
 they have to share all of the partitions between them. Worst case is the short period when only one
 consumer is subscribed, it has to handle network connections and data buffers for all 244 topics.
 
-
-
 \subsection{Kafka  archive}
 \label{kafka-archive}
-
-\subsection{Resource contention}
-\label{kafka-contention}
-
-
-\subsubsection{Static schema}
-\label{avro-schema.static}
-
-\subsubsection{Inline schema}
-\label{avro-schema.inline}
-
-\subsubsection{Schema registry}
-\label{avro-schema.registry}
-
-\schemaregistry\footurl{https://www.confluent.io/confluent-schema-registry/}
-
-\subsection{Reliable clouds}
-\label{reliable-clouds}
-
-There is a often quoted joke in the IT world along the lines of \textit{"the cloud means other people's computers"}. The problems we encountered with the \eleanor \openstack deployments brought this into focus for us.
-
-\subsubsection{The new operating system}
-\label{the-new-operating-system}
 
 
 \printbibliography
