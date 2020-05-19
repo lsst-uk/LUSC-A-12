@@ -75,7 +75,12 @@
 \newcommand{\cassandra} {Cassandra\xspace}
 \newcommand{\zookeeper} {Zookeeper\xspace}
 
+\newcommand{\kftopic} {\textit{topic}\xspace}
+\newcommand{\kftopics} {\textit{topics}\xspace}
+\newcommand{\kfstream} {\textit{stream}\xspace}
+\newcommand{\kfstreams} {\textit{streams}\xspace}
 \newcommand{\kfbroker} {\textit{broker}\xspace}
+\newcommand{\kfbrokers} {\textit{brokers}\xspace}
 \newcommand{\kfconsumer} {\textit{consumer}\xspace}
 \newcommand{\kfconsumers} {\textit{consumers}\xspace}
 \newcommand{\kfproducer} {\textit{producer}\xspace}
@@ -139,42 +144,54 @@
 \newcommand{\eleanor} {Eleanor\xspace}
 \newcommand{\cumulus} {Cumulus\xspace}
 
+\newcommand{\hdisk} {disk\xspace}
+
 \newcommand{\footurl}[1] {\footnote{\burl{#1}}}
 
 \usepackage{color}
 \usepackage{listings}
 \usepackage{changepage}
 
-\definecolor{codeblue}{RGB}{42,0.0,255}
+\usepackage{courier}
+%\usepackage{beramono}
+
+
+\lstset{basicstyle=\ttfamily\small}
+\lstset{basewidth={0.5em,0.5em}}
+
+\definecolor{codeblue}{RGB}{42,0,255}
 \definecolor{codegreen}{RGB}{63,127,95}
 \definecolor{codelilac}{RGB}{127,0,85}
 
 \lstloadlanguages{Java}
 \lstdefinestyle{Java}{
     language=Java,
-    basicstyle=\ttfamily\footnotesize,
-    backgroundcolor=\color{white},
+    identifierstyle=\color{codeblue},
     commentstyle=\color{codegreen}\textit,
+    keywordstyle=\color{codelilac},
     keepspaces=true,
-    keywordstyle=\color{codeblue},
     morekeywords={enum},
     }
+
+\newcommand{\javaname}[1] {{\ttfamily\color{codeblue} #1}}
+\newcommand{\javaplural}[1] {\javaname{#1}s}
 
 \lstloadlanguages{SQL}
 \lstdefinestyle{SQL}{
     language=SQL,
-    basicstyle=\ttfamily\footnotesize,
-    backgroundcolor=\color{white},
     commentstyle=\color{codegreen}\textit,
     keepspaces=true,
     keywordstyle=\color{codeblue},
     morekeywords={enum},
     }
 
+% YAML formatting.
+% https://tex.stackexchange.com/questions/152829/how-can-i-highlight-yaml-code-in-a-pretty-way-with-listings
+
 % \usepackage[dvipsnames]{xcolor}
-\newcommand\YAMLcolonstyle{\color{codelilac}}
-\newcommand\YAMLkeystyle{\color{codeblue}}
-\newcommand\YAMLvaluestyle{\color{codegreen}}
+\newcommand\YAMLcolonstyle{\ttfamily\small\color{codeblue}}
+\newcommand\YAMLkeystyle{\ttfamily\small\color{codeblue}}
+\newcommand\YAMLvaluestyle{\ttfamily\small\color{codegreen}}
 
 \makeatletter
 % here is a macro expanding to the name of the language
@@ -183,8 +200,6 @@
 
 \expandafter\expandafter\expandafter\lstdefinelanguage
 \expandafter{\language@yaml}{
-    basicstyle=\ttfamily\footnotesize\YAMLkeystyle,
-    backgroundcolor=\color{white},
     keywords={true,false,null,y,n},
     keywordstyle=\color{codeblue},
     basicstyle=\YAMLkeystyle, % assuming a key comes first
@@ -219,6 +234,7 @@
 %https://guides.github.com/activities/citable-code/
 
 \tableofcontents
+\clearpage
 
 \section{Introduction}
 \label{introduction}
@@ -313,15 +329,14 @@ This translation can be handled by the input buffer, replacing the upstream sche
 
 \subsubsection{Topic merge}
 \label{stage-1.topic-merge}
-The current stream from \ztf is published as a series of separate daily topics, one for each night of observations. Our understanding is that the \lsst project are likely to do the same for their stream.
-Handling the data in chunks like this a useful format to manage the bulk transfer and archiving of the data. When making backups or managing data transfers it is convenient to be able to refer to [\textit{the data from yesterday}] or [\textit{the data from three days ago}]. However, our end users are more likely to want to access [\textit{the live data from \lsst}], in one continuous stream.
+The current stream from \ztf is published as a series of separate daily \kftopics, one for each night of observations. Handling the data in chunks like this a useful format to manage the bulk transfer and archiving of the data. When making backups or managing data transfers it is convenient to be able to refer to [\textit{the data from yesterday}] or [\textit{the data from three days ago}]. However, our end users are more likely to want to access [\textit{the live data from \lsst}], in one continuous stream.
 
-Ideally it would be useful to have access to both a single continuous stream for the science use cases, and a series of separate daily streams for system administration and backups.
+Ideally it would be useful to have access to both a single continuous \kfstream for the science use cases, and a series of separate daily \kftopics for system administration and backups.
 
-Depending on how the live data stream from \lsst is configured, as a single continuous stream or as separate daily topics, our \fifo buffer can either split the continuous stream into separate topics for the system administration tasks, or merge the separate topics into one continuous stream for our science use cases.
+Depending on how the live data stream from \lsst is configured, as a single continuous \kfstream or as separate daily \kfstreams, our \fifo buffer can either split the continuous \kfstream into separate \kftopics for the system administration tasks, or merge the separate \kftopics into one continuous \kfstream for our science uses.
 
-By placing our own \fifo buffer at the head of our processing chain we are insulated from changes to the design of the upstream live stream from \lsst.
-Our \fifo buffer would handle changes to the topics and schema by the upstream service and present a consistent set of topics and schema to our internal components.
+By placing our own \fifo buffer at the head of our processing chain we are insulated from changes to the design of the upstream \kfstream from \lsst.
+Our \fifo buffer would handle changes to the \kftopics and schema by the upstream service and present a consistent set of \kftopics and schema to our internal components.
 
 \subsubsection{Test data}
 \label{stage-1.test-data}
@@ -337,8 +352,8 @@ Example test data:
 
 The advantage of using the same \kafka service to store and serve test data is it means our components can use the same libraries and configuration tools in development, testing and live production.
 
-In order to evaluate this use case we have been experimenting with maintaining a \kafka service configured as a rolling 7 day \fifo buffer, using it as source for test data and as a permanent data archive.
-In the process we have learned a lot about configuring and administering \kafka services, which we describe in more detail in Section \ref{kafka-compendium}.
+In order to evaluate this use case we have been experimenting with maintaining a \kafka \kfbroker configured as a rolling 7 day \fifo buffer, using it as source for test data and as a permanent data archive.
+In the process we have learned a lot about configuring and administering a \kafka \kfbroker, which we describe in more detail in Section \ref{kafka-compendium}.
 The key points are :
 \begin{itemize}
     \item Deploying \kafka as a 7 day \fifo buffer requires very little additional configuration. The default out of the box configuration deploys a simple \fifo buffer.
@@ -352,11 +367,11 @@ Based on our experience of working with the tools and client libraries provided 
 
 \subsection{Stage 2, workflow components}
 \label{stage-2}
-The second stage of processing consists of a set of loosely coupled components that consume data from a stream, apply a filter or processing step, and produce a new stream of results.
+The second stage of processing consists of a set of loosely coupled components that consume data from a \kfstream, apply a filter or processing step, and produce a new stream of results.
 
-\kafka is designed to distribute messages to multiple clients reading messages from the same topic at different speeds. Section \ref{kafka-offsets} describes how \kafka supports this in more detail, but what it means for us is we can have multiple different components subscribed to the output of the \stageone buffer processing the messages at different rates without interfering with each other.
+\kafka is designed to distribute messages to multiple clients reading messages from the same \kfstream at different speeds. Section \ref{kafka-offsets} describes how \kafka supports this in more detail, but what it means for us is we can have multiple different components subscribed to the output of the \stageone buffer processing the messages at different rates without interfering with each other.
 
-A mixture of slow, low bandwidth, components gradually working through the alert messages can subscribe to the same \kafka topic as high speed, high bandwidth, components processing the alert messages as fast as possible. The \kafka service takes care of buffering the data so that all of the components get to see all of the alert messages in the right order.
+A mixture of slow, low bandwidth, components gradually working through the alert messages can subscribe to the same \kafka \kfstream as high speed, high bandwidth, components processing the alert messages as fast as possible. The \kafka service takes care of buffering the data so that all of the components get to see all of the alert messages in the right order.
 
 \subsubsection{High speed components}
 \label{stage-2.high-speed.components}
@@ -400,7 +415,7 @@ While the low speed components don't need to be able to match the peak bandwidth
 \subsubsection{Component libraries}
 \label{stage-2.component-libraries}
 
-In order to help develop these processors and filters we should provide a set of Java and Python libraries that implement the support functionality needed to connect to \kafka services, subscribe to topics, read and write messages, \serz and \deserz \avro messages etc.
+In order to help develop these processors and filters the \lsstuk project should provide a set of Java and Python libraries that implement the support functionality needed to connect to \kafka services, subscribe to \kftopics, read and write messages, \serz and \deserz \avro messages etc.
 
 Using a common set of well tested libraries will help to make our own components easier to develop and more reliable to use. It will also help to lower the barrier to entry for 3rd party developers to create their own processors and filters.
 
@@ -446,7 +461,7 @@ Some of the key lessons learned were:
 \begin{itemize}
     \item Configuring \kafka as a \fifo buffer is close to the default 'out of the box` configuration.
     \item Configuring \kafka as a long term archive is possible, but there are issues regarding data management that mean it is probably not the best solution (this is discussed in more detail in Section \ref{kafka-archive}). 
-    \item A \kafka instance will fail fast. If there is anything wrong with the service or its configuration, e.g. out of disc space in a log directory, it will disconnect itself from the \kafka cluster and shut itself down.
+    \item A \kafka instance will fail fast. If there is anything wrong with the service or its configuration, e.g. out of \hdisk space in a log directory, it will disconnect itself from the \kafka cluster and shut itself down.
     \item The host names or IP addresses used for the \kafka server endpoint addresses need to be resolvable and accessible from both inside and outside the \openstack system, which can cause problems at the network routing level when using \docker containers inside \openstack (see Section \ref{kafka-hostnames} for more details).
 \end{itemize}
 
@@ -596,7 +611,7 @@ The trade off is to start the selection process using very simple steps, signifi
 \subsection{Database platform}
 \label{database-platform}
 
-Due to the nature of the problem, performing a \crossmatch using a conventional database system tends to be limited by physical I/O performance. The overhead of getting the data off disc can obscure the relative performance of the indexing algorithms.
+Due to the nature of the problem, performing a \crossmatch using a conventional database system tends to be limited by physical I/O performance. The overhead of getting the data off \hdisk can obscure the relative performance of the indexing algorithms.
 
 In order to maximize the performance, the experiments used an in-memory instance of the Hyper SQL Database (\hsqldb)\footurl{http://hsqldb.org/} database engine to evaluate the different algorithms. The reasoning behind this is that once the I/O data access bottle neck is removed from the equation, the differences between the indexing algorithms becomes much more significant.
 
@@ -665,15 +680,38 @@ This becomes more significant as the size of the data set grows. By the time the
 \subsection{Algorithm comparison}
 \label{database-algorithms}
 
-The tests were designed to run three different algorithms in the same test framework and compare their performance against a range of different data set sizes, search radii and zone heights.
+The tests were designed to run the different algorithms in the same test framework and compare their performance with different data set sizes, search radii and indexing.
 
-The test framework is implemented as a set of Java \junit tests, using an abstract \texttt{Matcher} interface for the \crossmatch components.
-Each of the \crossmatch algorithms is wrapped as a component that implements the  \texttt{Matcher} interface enabling it to be plugged in to the test framework.
-This component based design enables us to apply the same set of test conditions to each of the algorithms in turn, re-using the rest of the framework code each time.
+The test framework is implemented as a set of Java \junit tests, using an abstract \javaname{Matcher} interface for the \crossmatch components.
+Each of the \crossmatch algorithms is implemented as a component that implements the \javaname{Matcher} interface.
+
+\begin{lstlisting}[style=Java]
+    public interface Matcher
+        {
+        /**
+         * Insert a {@link Position} into the {@link Matcher}.
+         * 
+         */
+        public void insert(final Position position);
+
+        /**
+         * Match {@link Position}s within a radius around a target {@link Position}.
+         * 
+         */
+        public Iterator<Position> match(final Position target, final Double radius);
+
+        ....
+        }
+\end{lstlisting}
+
+The \javaname{Matcher} interface has two key methods.
+An \javaname{insert(..)} method for inserting test data into the database and a \javaname{match(..)} method that performs a \crossmatch and returns a \javaname{List} of matching \javaplural{Position}.
+
+This interface based design enables us to apply the same set of test conditions to each of the algorithms in turn, re-using the rest of the framework code each time.
 
 The test framework around this is split into two sets of nested loops, the outer data generation loops and the inner \crossmatch selection loops.
 
-The data generation and the \crossmatch tests are centred on a single target position for a test run, configured using \texttt{target.ra} and \texttt{target.dec} properties which set the right ascension (\textit{ra}) and declination (\textit{dec}) of the target position in degrees.
+The data generation and \crossmatch tests are centred on a single target position for a test run, configured using \texttt{target.ra} and \texttt{target.dec} properties which set the right ascension (\textit{ra}) and declination (\textit{dec}) of the target position in degrees.
 
 The outer most loop of the data generation loops uses the \texttt{range.min} and \texttt{range.max} configuration properties to control the range of data values inserted into the database.
 \begin{itemize}
@@ -833,10 +871,6 @@ In order to save time during development and make the testing more efficient, th
 \end{lstlisting}
 
 The outer loop will step through the first eight iterations of the loop, \textit{n=0} to \textit{n=9}, adding points to the data set but not applying the \crossmatch tests. The \crossmatch tests are only applied for iterations above limit set by \texttt{select.min}; iterations \textit{n=10} (1,050,625 points), \textit{n=11} (4,198,401 points) and \textit{n=12} (16,785,409 points).
-
-
-
-
 
 The inner loop performs the cross match searches and collects the timing statistics for comparison. 
 
@@ -1139,7 +1173,7 @@ The meaning of the result codes are :
 \subsubsection{Component}
 \label{java-interfaces.Component}
 
-The framework also provides a template implementation of a component that can connect to a Kafka service, subscribed to a topic, read alert messages from the topic, \deserz them into Java objects and passes each \texttt{Candidate} object to a \texttt{process()} method.
+The framework also provides a template implementation of a component that can connect to a Kafka service, subscribed to a \kftopic, read alert messages from the \kftopic, \deserz them into Java objects and passes each \texttt{Candidate} object to a \texttt{process()} method.
 
 \begin{lstlisting}[style=Java]
     /**
@@ -1167,7 +1201,7 @@ The framework also provides a template implementation of a component that can co
         }
 \end{lstlisting}
 
-Extend this a bit further, adding a list of \texttt{Processor} instances and a \texttt{for} loop to iterate through the list, we can define a \texttt{Component} that applies a sequence of  \texttt{Processor}s to an input stream of \texttt{Candidate}s.
+Extend this a bit further, adding a list of \javaname{Processor} instances and a \texttt{for} loop to iterate through the list, we can define a \javaname{Component} that applies a sequence of \javaplural{Processor} to an input stream of \javaplural{Candidate}.
 
 \begin{lstlisting}[style=Java]
     /**
@@ -1472,14 +1506,14 @@ By extending the \texttt{SolarSystemFilter} to add a switch that either includes
     \end{itemize}
 \end{itemize}
 
-\subsubsection{Crossmatch example}
+\subsubsection{Crossmatch component}
 \label{workflow.cross-match}
 
-Section \ref{crossmatch-zones} describes the algorithms and indexing used in a set of experiments to look at a high speed \crossmatch for matching \texttt{Candidates} against a catalog of positions.
+Section \ref{crossmatch-zones} describes some \crossmatch algorithms and indexing for matching alert Candidates against a catalog of positions.
 
-However, at this level, the \crossmatch can be modelled as a \texttt{CatalogMatcher} component that matches each \texttt{Candidate} against the catalog of positions, adding an annotation to the \texttt{Candidate} to hold the result of the match.
+These \crossmatch algorithms can be used to build a \javaname{CatalogMatcher} component that matches each candidate against a catalog of positions, adding an annotation to the \javaname{Candidate} object with the result of each match.
 
-Each annotation contains an identifier and position for the \texttt{Candidate}, an identifier and position for the catalog entry it has been matched with and the distance between the two positions.
+Each annotation contains an identifier and position for the \javaname{Candidate}, an identifier and position for the catalog entry it has been matched with and the distance between the two positions.
 
 \begin{lstlisting}[style=Java]
     interface CandidateMatch
@@ -1499,7 +1533,7 @@ Each annotation contains an identifier and position for the \texttt{Candidate}, 
         }
 \end{lstlisting}
 
-We can extend the \texttt{Candidate} class, adding a list of \crossmatch matches, creating a new class, \texttt{AnnotatedCandidate}.
+We can extend the \javaname{Candidate} class, adding a list of \crossmatch matches, creating a new class, \javaname{AnnotatedCandidate}.
 
 \begin{lstlisting}[style=Java]
     interface AnnotatedCandidate extends Candidate
@@ -1508,84 +1542,89 @@ We can extend the \texttt{Candidate} class, adding a list of \crossmatch matches
         }
 \end{lstlisting}
 
-We can use this to build a component that combines a \texttt{CatalogMatcher} that matches the candidates against a catalog and a \texttt{KafkaProducer} that send the results to a new stream.
+We can use this to build a component that combines a \javaname{CatalogMatcher} that matches the candidates against a catalog and a \javaname{KafkaProducer} that sends the results to a new \kftopic.
 
+[[diagram]]
 \begin{itemize}
-    \item A \texttt{CrossmatchComponent} that generates a new stream of \crossmatch annotated candidates :
+    \item A \inlinecode{CrossmatchComponent} that generates a \kfstream of \crossmatch annotated candidates :
     \begin{itemize}
-        \item \texttt{CatalogMatcher} matches against a catalog and adds annotations.
+        \item \inlinecode{CatalogMatcher} matches against a catalog and adds annotations.
     \end{itemize}
     \begin{itemize}
-        \item \texttt{KafkaProducer} writes annotated candidates to a new Kafka stream.
+        \item \inlinecode{KafkaProducer} writes annotated candidates to a new \kftopic.
     \end{itemize}
 \end{itemize}
 
-In most cases it does not make sense to \crossmatch \texttt{Candidates} that have already been associated with know solar system objects, so we want to exclude the solar system objects from the \crossmatch processing.
+In most cases it does not make sense to \crossmatch candidates that have already been associated with known solar system objects, so we want to exclude the solar system objects from the \crossmatch processing.
 
-One way to achieve this would be to use separate stream processing Components and connect them together using a \kafka stream, connecting the output from the \texttt{SolarSystemComponent} to the input of the \texttt{CrossmatchComponent}.
+One way to achieve this would be to use separate \javaplural{Component} and connect them together using \kafka \kfstreams. Connecting the output from a \javaname{SolarSystemFilter} \javaname{Component} to the input of a \javaname{CrossmatchComponent}.
 
+[[diagram]]
 \begin{itemize}
-    \item A \texttt{Component} that generates a new stream of \texttt{Candidates} that are \textbf{not} associated with solar system objects:
+    \item A \javaname{Component} that generates a stream of candidates that are not associated with known solar system objects:
     \begin{itemize}
-        \item \texttt{SolarSystemFilter} configured to exclude any solar system object.
+        \item \javaname{SolarSystemFilter} configured to exclude solar system objects.
     \end{itemize}
     \begin{itemize}
-        \item \texttt{KafkaProducer} writes solar-system alerts to a new Kafka stream.
+        \item \javaname{KafkaProducer} outputs filtered alerts to a \kafka \kftopic.
     \end{itemize}
 \end{itemize}
 
 \begin{itemize}
-    \item A \texttt{Component} that generates a new stream of \crossmatch annotated \texttt{Candidates}:
+    \item A \javaname{Component} that generates a stream of \crossmatch annotated candidates:
     \begin{itemize}
-        \item \texttt{CatalogMatcher} matches against a catalog and adds annotations.
+        \item \javaname{CatalogMatcher} matches against a catalog and adds annotations.
     \end{itemize}
     \begin{itemize}
-        \item \texttt{KafkaProducer} writes annotated candidates to a new Kafka stream.
+        \item \javaname{KafkaProducer} writes annotated candidates to a \kafka \kftopic.
     \end{itemize}
 \end{itemize}
 
-Alternatively, we could combine the \texttt{SolarSystemFilter} and \texttt{CatalogMatcher} processors in the same \texttt{Component} linking them together by adding both of them to the same List of \texttt{Processors}.
+Alternatively, we could combine the \javaname{SolarSystemFilter} and \javaname{CatalogMatcher} in the same \javaname{Component}.
 
+[[diagram]]
 \begin{itemize}
-    \item A \texttt{Component} that generates a new stream of \crossmatch annotated \texttt{Candidates} that are \textbf{not} associated with solar system objects:
+    \item A \javaname{Component} that generates a \kfstream of \crossmatch annotated \texttt{Candidates} that are not associated with solar system objects:
     \begin{itemize}
-        \item \texttt{SolarSystemFilter} configured to exclude any solar system object.
+        \item \javaname{SolarSystemFilter} configured to exclude solar system objects.
     \end{itemize}
     \begin{itemize}
-        \item \texttt{CatalogMatcher} matches against a catalog and adds annotations.
+        \item \javaname{CatalogMatcher} that matches against a catalog and adds annotations.
     \end{itemize}
     \begin{itemize}
-        \item \texttt{KafkaProducer} writes annotated candidates to a new Kafka stream.
+        \item \javaname{KafkaProducer} writes annotated candidates to a \kafka \kftopic.
     \end{itemize}
 \end{itemize}
 
-In this example, the resource cost of the \texttt{SolarSystemFilter} is so low, the combined solution is probably the most practical. The resource cost of publishing the non-solar-system results as a separate stream and reading them back in to to the \crossmatch processor out-weighs the minimal cost of implementing the simple \texttt{SolarSystemFilter}.
+In this example, the resource cost of the \javaname{SolarSystemFilter} is so low, the combined solution is probably the most practical. The resource cost of publishing the non-solar-system alerts as a separate \kftopic and reading them back in to the \crossmatch processor out-weighs the minimal cost of including an additional copy of the \javaname{SolarSystemFilter}.
 
-In contrast, a \texttt{CrossmatchProcessor} for a large catalog requires a lot of resources to implement; significantly more resources than would be needed by an additional \kafka stream. So if we have multiple use cases that need to use the results of the \crossmatch, it would be better to do the \crossmatch calculation once and publish the results as a new stream of annotated Candidates. This new stream can then be used as the source stream for a range of different processors.
+In contrast, a \javaname{CrossmatchProcessor} for a large catalog requires a lot of resources to implement; significantly more resources than would be needed to handle a new \kftopic in our \kafka \kfbroker. So if we have multiple use cases that need to use the results of the \crossmatch, it would be better to do the \crossmatch calculation once and publish the results as a new \kafka \kftopic for everyone to use.
 
-In general, the cost/benefit of combining multiple \texttt{Processors} within a complex \texttt{Component}, or deploying them in separate \texttt{Components}, joining the output stream of one as the input to the next depends on the relative resource costs of performing the each of the processing steps compared to the resource cost of adding another Kafka stream.
+The cost/benefit of combining \javaplural{Processor} within a complex \javaname{Component}, or deploying them as separate \javaplural{Component} depends on the resource costs of performing the each of the processing steps compared to the resource cost of publishing a new \kftopic in our \kafka \kfbroker.
 
-High cost processors like a \texttt{CrossmatchProcessor} are a better fit for deploying as separate Kafka streams. Low cost processors like our \texttt{SolarSystemFilter} are better suited to being combined into compound \texttt{Components}.
+High cost processors like the \javaname{CrossmatchProcessor} are a better fit for deploying as separate \kftopics. Low cost processors like the \javaname{SolarSystemFilter} are better suited to being combined into compound \javaname{Components}.
 
-In all probability, our use cases will need to use a combination of both methods for combining \texttt{Components} and \texttt{Processors}, complex \texttt{Components} and \kafka streams.
+We expect that our use cases will need to use a combination of both methods for combining \javaplural{Component} and \javaplural{Processor}, complex \javaplural{Component} and \kftopics.
 
 \subsubsection{Kafka components}
 \label{workflow.kafka-components}
 
-Where we do need to use \kafka streams to link the input and outputs of \texttt{Components}, there are two options for deploying the \kafka services. 
-The first option is to simply add another stream to the existing \kafka service that is providing the \stageone input buffer. However, this may cause issues with resource contention for the physical network and disks.
+There are two options for handling the \kafka \kfstreams and \kftopics needed to link the input and outputs of our \javaplural{Component}. 
 
-There will probably be a lot of \kafka clients subscribed to the output of the main \stageone \kafka buffer, and a similar number of clients will want to subscribe to the output of the main catalog \crossmatch. Serving two heavily subscribed streams from the same logical \kafka service, served by the same set of physical \kafka servers, could cause resource contention (see section \ref{kafka-contention}).
+The first option is to simply add another \kftopic to the existing \kafka \kfbroker that is providing the \stageone input buffer. However this may cause issues with resource contention for the physical network and storage.
+There may be a large number of \kfconsumers subscribed to both the main \stageone \kfbroker \kftopic and the catalog \crossmatch \kftopics.
+In which case it may be better to use a different \kfbroker to provide the internal \kftopics linking the workflow \javaplural{Component}.
 
-In which case, it makes sense to use multiple separate \kafka services deployed on separate physical servers to provide the internal streams between the workflow \texttt{Components}.
+Extending this idea further.
+If we intend to allow end users to configure their own workflows, then it may make sense to deploy multiple \kafka \kfbrokers, one for each workflow.
+To help configure and manage this interconnected network we can treat the \kafka \kfbrokers as just another component, configured and deployed automatically using a similar \yaml configuration file as the processing components.
 
-To help configure and manage this interconnected graph of \kafka services and \texttt{Components} we can model the \kafka services themselves as components in a larger system, configured and deployed automatically using a similar \yaml configuration file as the processing components.
-
+%\begin{lstlisting}[]
 \begin{lstlisting}[language=yaml]
   component:
-    type: "kafka-buffer"
-    instances: 4
-    serviceid: "serviceid-903a2730-240426063766"
+    type: "kafka-broker"
+    servers: 4 
+    brokerid: "brokerid-903a2730-240426063766"
 
     topics:
 
@@ -1600,29 +1639,37 @@ To help configure and manage this interconnected graph of \kafka services and \t
           partitions  : 64
 \end{lstlisting}
 
-Treating \kafka services as components makes it easy to deploy alongside the processing components. A single \yaml configuration file could describe a chain of \kafka buffers and processing nodes that work together to implement everything needed for a science use case.
+This simple \yaml configuration would deploy a new \kafka \kfbroker service, consisting of 4 server instances along with the associated \zookeeper service and any monitoring and management services needed to administer them.
+
+[[diagram]]
+
+Treating a \kafka \kfbroker as just another component makes it easy to deploy it alongside the processing components. A single \yaml configuration file could describe a chain of \kafka \kfbrokers and processing nodes that work together to implement everything needed for a science use case.
 
 Readers familiar with the \docker eco-system will recognise a similarity between these \yaml configuration files and \dockercompose configuration files used to deploy groups of \docker containers.
 Implementing the system behind this framework will probably use many of the infrastructure orchestration tools provided by \openstack, \docker and \kubernetes.
 
-However, where possible we should avoid exposing these interfaces directly to either our science users or our system administrators. The component configuration outlined above is intended to provide thin interface layer that sits on top of the system level tools and processes.
+However, where possible we should avoid exposing the implementation details of
+these lower level orchestration tools to either our science users or system administrators. The abstract component configuration outlined above is intended to provide thin abstraction layer that sits on top of the system level tools and provides an abstraction layer between the programming interface that the user interacts with and the orchestration technologies selected to implement the system.
 
-The goal of this interface is to provide an abstraction layer between the programming interface that the user interacts with and the technologies selected to implement the system underneath. We don't want to develop a new set of orchestration tools. Equally, we do not want implementation specific details of the underlying technologies to be exposed as part of the user interface (GUI or API).
+We don't want to develop a new set of orchestration tools. Equally, we do not want implementation specific details of the underlying technologies to be exposed as part of the user interface (GUI or API).
 
 Designing our own an abstraction layer has a number of advantages.
 
-1) It provides a level of insulation between our users and the technologies we have selected to build the system. Containerization and container orchestration is new and rapidly changing field and the technologies behind it are themselves evolving rapidly.
+1) It provides a level of insulation between our users and the technologies we have selected to build the system. Containerization and container orchestration is rapidly changing field and the technologies behind it are themselves evolving rapidly.
 Using our own components for the the user facing interface means we can evolve our implementation to adopt new technologies as they become available without causing migration problems for our users.
 
-2) It is unlikely that one technology will provide everything we will need to implement all of the functionality we want to have. As a result we will need to use a combination of different technologies, tools and frameworks to implement the system. Each of which will have their own slightly different programming interface and configuration file syntax.
+2) It is unlikely that one technology will provide everything we will need to implement all of the functionality we want to have. As a result we will need to use a combination of different technologies, tools and frameworks to implement the system. Each of which will have their own programming interface and configuration file syntax.
 Using our own components for the the user facing API means our system can use a consistent programming interface and configuration syntax across all the different layers of the system.
 
-3) Using a mapping between our component configuration interface and the underlying technologies means it will be easier to make our components portable across a range of different platforms.
+3) If we use the same orchestration tool for both the workflow management and the underlying system deployment, then we may run into access control issues.
+We don't want our end users to be able to access or modify the deployment of the underlying system services. Which means we would need to implement some form of access control that limits which parts of the system different users are allowed to access and to modify.
+If we use our own components for the the user facing API, then we can control which parts of the system they have access to. Science users would be able to access and modify their own workflows through the science workflow interface, and system administrators would be able to access the system service deployments using the lower level orchestration tools directly.
 
-Our initial system will probably be developed using a combination of \kvm, \openstack and \kubernetes. However, we may also want to implement a lightweight version using technologies such as \virtualbox and \vagrant to provide parts of the virtualization layer.
-As long as the lightweight platform uses the same \yaml syntax for the component configuration files and the same containerization layer interface, then a researcher could use the lightweight platform to develop their processing components using local test data, and be confident that they could deploy their processing components into a full scale system without having to make major changes.
+4) Using a mapping between our component configuration interface and the underlying technologies means it will be easier to make our components portable across a range of different platforms.
 
-\section{Kafka compendium}
+Ideally we would want a researcher to be able to experiment with developing their workflow components on their desktop or laptop, and then be able to deploy the same workflow onto a cloud compute platform without having to make any code changes.
+
+\section{Kafka experiments}
 \label{kafka-compendium}
 
 The following sections report on lessons learned from our experience of working with \kafka during \phasea of the \lsstuk project.
