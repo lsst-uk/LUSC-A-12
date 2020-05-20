@@ -118,6 +118,7 @@
 \newcommand{\deserzed}  {deserialized\xspace}
 \newcommand{\deserzer}  {deserializer\xspace}
 \newcommand{\deserzers} {deserializers\xspace}
+\newcommand{\deserzing} {deserializing\xspace}
 
 \newcommand{\phasea} {phase A\xspace}
 \newcommand{\phaseb} {phase B\xspace}
@@ -466,8 +467,7 @@ Some of the key lessons learned were:
 \end{itemize}
 
 Mid way through the series of \phasea experiments on \kafka the \eleanor system experienced a number of issues to do with the configuration of the \openstack network components which eventually lead to the platform being shutdown.
-An unintended side effect of this was that we gained experience in trying to maintain a \kafka service on an unstable platform, and learned some important insights into the stability and resilience of deploying services on a cloud compute infrastructure.
-The lessons learned from this experience is discussed in more detail in Section \ref{reliable-clouds}.
+An unintended side effect of this was that we gained experience in trying to maintain a \kafka service on an unstable platform, and learned some important insights into the stability and resilience issues inherent in deploying services on a cloud compute infrastructure.
 
 \subsection{Testbed platform}
 \label{deployment-testbed.platform}
@@ -480,7 +480,7 @@ As a result the development of the \testplatform started with a basic deployment
 
 Another reason for not using \openstack to provision resources on the \testplatform is that one of the things we wanted to explore with the local \testplatform is how different configurations of software and hardware effected the system performance. To do this we needed direct control over how and where the resources were allocated and direct access to the underlying system to be able to monitor the performance. 
 
-Given that we now have access to at three different \openstack systems, the \eleanor system managed by \uedin IT services, the xyz system at \ral and the \cumulus cloud at \cam provided by \iris, it makes sense to keep the \testplatform for low level experiments with direct access to the physical hardware rather than adding the additional abstraction layers of an \openstack deployment.
+Given that we now have access to at three different \openstack systems, the \eleanor system managed by \uedin IT services and the \iris systems at \ral and \cam, it made sense to keep the \testplatform for low level experiments with direct access to the physical hardware rather than adding the additional abstraction layers of an \openstack deployment.
 
 \subsection{\ischnura \libvirt}
 \label{deployment.ischnura-libvirt}
@@ -655,8 +655,8 @@ The fourth pass adds another 208 points to create a 17x17 grid of 289 points aro
 
 The new points added by each iteration are added in between the exiting points, keeping the maximum and minimum range the same. The result of adding more points increases the density of points around the target, which in turn increases the number of points within the search radius.
 
-The algorithm is designed to only adds the new points needed to extend the data set to the new size, it will avoid duplicating the existing points.
-This becomes more significant as the size of the data set grows. By the time the algorithm reaches the \textit{12th} and \textit{13th} iterations, avoiding duplicating the existing sixteen million points when updating the data set from sixteen million to sixty seven million points can save a significant amount of time.
+The data generator only adds the new points needed to extend the data set to the new size, it will avoid duplicating the existing points.
+This becomes more significant as the size of the data set grows. By the time the algorithm reaches the \textit{12th} and \textit{13th} iterations, avoiding duplicating the existing sixteen million points when updating the data set from sixteen million to sixty seven million points saves a significant amount of time.
 
 \begin{equation*}
 \begin{split}
@@ -709,11 +709,13 @@ An \javaname{insert(..)} method for inserting test data into the database and a 
 
 This interface based design enables us to apply the same set of test conditions to each of the algorithms in turn, re-using the rest of the framework code each time.
 
+\clearpage
+
 The test framework around this is split into two sets of nested loops, the outer data generation loops and the inner \crossmatch selection loops.
 
-The data generation and \crossmatch tests are centred on a single target position for a test run, configured using \texttt{target.ra} and \texttt{target.dec} properties which set the right ascension (\textit{ra}) and declination (\textit{dec}) of the target position in degrees.
+The \crossmatch tests are centred on a target position for each test run, configured using the \texttt{target.ra} and \texttt{target.dec} configuration properties.
 
-The outer most loop of the data generation loops uses the \texttt{range.min} and \texttt{range.max} configuration properties to control the range of data values inserted into the database.
+The outer most loop of the data generation loops uses the \texttt{range.min} and \texttt{range.max} configuration properties to control the range of data values in the test data.
 \begin{itemize}
     \item \texttt{range.min} sets the lower limit for the range of values.
     \item \texttt{range.max} sets the upper limit for the range of values.
@@ -853,7 +855,6 @@ Figure \ref{fig:data-range-01} shows the effect of keeping the number of points 
 \label{fig:data-range-01}
 \end{figure}
 
-
 As the size of the test data set grows, creating and indexing the data takes up more time than the \crossmatch tests themselves.
 Each iteration of the outer loop uses the test data generator described in Section \ref{test-data-generator} to add another layer of points to the test data and then calls the inner loop to run a series of \crossmatch tests.
 Splitting the functionality onto an inner and outer loop enables us to apply the \crossmatch tests to a series of progressively larger data sets without having to re-build the whole data set each time. 
@@ -880,6 +881,11 @@ The configuration for the inner loop enables us to change the following properti
     \item The search radius.
     \item The number of times the search is repeated.
 \end{itemize}
+
+\clearpage
+
+
+
 
 
 The HTM tests used the Java library from JHU to calculate which triangles intersected the target region and then queried the database to find all the sources within those triangles.
@@ -1546,12 +1552,12 @@ We can use this to build a component that combines a \javaname{CatalogMatcher} t
 
 [[diagram]]
 \begin{itemize}
-    \item A \inlinecode{CrossmatchComponent} that generates a \kfstream of \crossmatch annotated candidates :
+    \item A \javaname{CrossmatchComponent} that generates a \kfstream of \crossmatch annotated candidates :
     \begin{itemize}
-        \item \inlinecode{CatalogMatcher} matches against a catalog and adds annotations.
+        \item \javaname{CatalogMatcher} matches against a catalog and adds annotations.
     \end{itemize}
     \begin{itemize}
-        \item \inlinecode{KafkaProducer} writes annotated candidates to a new \kftopic.
+        \item \javaname{KafkaProducer} writes annotated candidates to a new \kftopic.
     \end{itemize}
 \end{itemize}
 
@@ -1639,7 +1645,7 @@ To help configure and manage this interconnected network we can treat the \kafka
           partitions  : 64
 \end{lstlisting}
 
-This simple \yaml configuration would deploy a new \kafka \kfbroker service, consisting of 4 server instances along with the associated \zookeeper service and any monitoring and management services needed to administer them.
+This simple \yaml configuration would deploy a new \kafka \kfbroker service, consisting of 4 servers running \kafa with the associated \zookeeper service and any monitoring and management services needed to administer them.
 
 [[diagram]]
 
@@ -1649,7 +1655,7 @@ Readers familiar with the \docker eco-system will recognise a similarity between
 Implementing the system behind this framework will probably use many of the infrastructure orchestration tools provided by \openstack, \docker and \kubernetes.
 
 However, where possible we should avoid exposing the implementation details of
-these lower level orchestration tools to either our science users or system administrators. The abstract component configuration outlined above is intended to provide thin abstraction layer that sits on top of the system level tools and provides an abstraction layer between the programming interface that the user interacts with and the orchestration technologies selected to implement the system.
+these lower level orchestration tools to either our science users or system administrators. The abstract component configuration outlined above is deliberately intended to separate the programming interface that the user interacts with from the orchestration technologies selected to implement the system.
 
 We don't want to develop a new set of orchestration tools. Equally, we do not want implementation specific details of the underlying technologies to be exposed as part of the user interface (GUI or API).
 
@@ -1677,68 +1683,72 @@ The following sections report on lessons learned from our experience of working 
 \subsection{Kafka introduction}
 \label{kafka-introduction}
 
-\kafka was designed as a reliable publish/subscribe message distribution service for sequential streams of data.
+\kafka is a reliable message distribution service for sequential streams of data.
 
-When describing \kafka systems we often refer to three components, a \kfproducer which produces messages, a \kfconsumer that consumes messages and a \kfbroker that acts as the store and forward delivery system, accepting messages from producers and delivering messages to consumers.
+\kafka systems are described in terms of three components, \kfproducers which produce messages, \kfconsumers that consumes messages and a \kfbroker that acts as the store and forward delivery system, accepting messages from \kfproducers and delivering messages to \kfconsumers.
 
-\kafka itself is the part in the middle, the broker that provides the message delivery system.
-The \kfproducer and \kfconsumer are clients, external and separate from the \kafka service.
+In this scenario, \kafka is the service in the middle, the \kfbroker that provides the message delivery system. The \kfproducer and \kfconsumer are clients, external and separate from the \kafka \kfbroker.
 
 The \kafka \kfbroker does not know where the messages come from, or what happens to them after they are delivered.
-The \kafka \kfbroker concentrates purely on listening for messages from the producers, storing them in a buffer and then forwarding them on to consumer.
+The \kafka \kfbroker concentrates purely on listening for messages from the \kfproducers, storing them in a buffer and forwarding them on to \kfconsumers.
 
-    {P} -> [broker] -> {C}
+   [producers] -> [broker] -> [consumers]
 
 \subsection{Publish-subscribe pattern}
 \label{kafka-pubsub-pattern}
 
-This separation between the delivery system and the message producing and consuming clients is described as the 
-publish-subscribe pattern \footurl{https://en.wikipedia.org/wiki/Publish-subscribe_pattern}.
+This separation between the delivery system and the message producing and consuming clients is referred to as the publish-subscribe or 'pub-sub' pattern \footurl{https://en.wikipedia.org/wiki/Publish-subscribe_pattern}.
 
-In terms of system architecture, the publishing component of the publish-subscribe pattern is referred to as a \kfpublisher, or in \kafka terms, a \kfproducer.
+The publishing component of the publish-subscribe pattern is referred to as a \kfpublisher, or in \kafka terms, a \kfproducer.
 
-   {Pub} -> [broker]
+   [publisher] -> [broker]
 
-In the publish-subscribe pattern, a \kfpublisher does not send messages to a specific destination, instead messages are tagged as belonging to a topic and sent to a delivery service or \kfbroker. Clients who wish to receive messages contact the broker and subscribe to a topic. The broker will then pass on messages it receives that have been tagged as belonging to that topic.
+In the publish-subscribe pattern, a \kfpublisher does not send the messages directly to their final destination. Instead the messages are tagged as belonging to a \kftopic and sent to the \kfbroker.
+Once a message has been sent to the \kfbroker the \kfproducer is no longer involved in the delivery.
+The \kfpublisher does not need to know anything about the \kfsubscribers, how many there are, where they are or what they do with the messages.
+The \kfbroker is responsible for storing and forwarding the message to the correct destinations, leaving the \kfproducer free to work on producing the next message.
 
-The choice of which messages belong to which topics is made by the \kfpublisher when they assign specific messages to specific topics. The broker does not read, interpret or filter the messages. It just passes messages on to the \kfsubscribers based on topic the messages have been tagged with. 
+The subscribing component of the publish-subscribe pattern is referred to as a \kfsubscriber, or in \kafka terms, a \kfconsumer.
 
-In terms of system architecture, the subscribing component is referred to as a \kfsubscriber, or in \kafka terms, a \kfconsumer.
+A \kfsubscriber does not need to know anything about the \kfpublishers, it just receives messages from the \kfbroker. 
 
-   [broker] -> {Sub}
+It is up to the \kfsubscriber to contact the \kfbroker and subscribe to a \kftopic. The \kfbroker will then pass on any messages it receives that have been tagged as belonging to that \kftopic.
 
-The \kfbroker bridges the gap between \kfpublisher and \kfsubscriber, passing on messages based on the topic they are tagged with.
+   [broker] -> [subscriber]
 
-   {Pub} -> [broker] -> {Sub}
+The \kfbroker bridges the gap between \kfpublisher and \kfsubscriber, passing on messages based on the \kftopic they have been tagged with.
 
-The \kfbroker provides an abstract interface between \kfpublisher and \kfsubscriber, insulating them from each other. A \kfpublisher does not need to know anything about the \kfsubscribers, how many there are, where they are or what they do with the messages. Likewise, a \kfsubscriber does not need to know anything about the \kfpublishers, they just receives messages from the broker. 
+    [publisher] -> [broker] -> [subscriber]
 
-In addition, the storage buffer in the broker can provide a separation in time between the publish and subscribe actions. The \kfpublisher may have already completed its task and finished executing by the time a \kfsubscriber connects to the broker and reads the messages sent by the \kfpublisher. 
+The choice of which messages belong to which \kftopics is not made by the \kfbroker. The assignment of messages to \kftopics is made by the \kfpublisher  when the messages  are sent to the \kfbroker. The \kafa \kfbroker does not read, interpret or filter the messages. It just passes messages on to \kfsubscribers based on which \kftopics the messages have been tagged with. 
 
 \subsection{Producers and consumers}
 \label{kafka-producer-consumer}
 
-At the software architecture level, a message \kfpublisher is called a \kfproducer in \kafka terminology, and a message \kfsubscriber is called a \kfconsumer in \kafka terminology.
+In \kafka terminology the \kfpublisher component of the publish-subscribe pattern is called a \kfproducer, and a \kfsubscriber component is called a \kfconsumer.
 
-At the software implementation level, a message \kfpublisher, or \kafka \kfproducer, uses a connector class from the \kafka client library to send messages to a \kafka broker.
-Unfortunately the class in the client library that sends messages to a broker is also called a \texttt{producer}. So in terms of what is in the source code, a message \kfpublisher sends its messages by calling the write method of a \kafka \texttt{producer}.
-This quirk of naming can cause some confusion when talking about \kfproducers and \kfconsumers with people who are not familiar with the \kafka terminology.
-It is important to keep in mind that the class in the client library is not a \kfproducer, it does not produce messages, it is just a connector. The whole message generating component is the \kfproducer, which makes use of a connector from the \kafka client library to send messages to a broker.
+At the implementation level, a \kfpublisher uses a connector class from the \kafka client library to send messages to a \kafka broker.
+Unfortunately the connector class in the client library also called a \javaname{Producer}. So in terms of what is in the source code, a message \kfpublisher sends its messages by calling the \javaname{write()} method on a \javaname{Producer} object.
+This quirk of naming can cause some confusion when talking about \kfproducers and \kfconsumers.
+It is important to keep in mind that the class in the client library is not a \kfproducer, it does not produce messages, it is just a connector. The whole message generating component is the \kfproducer, which makes use of a connector from the \kafka client library to send messages to a \kfbroker.
 
    {P(p)} -> [broker]
 
-Similarly, on the receiving side, a message \kfsubscriber, or \kafka \kfconsumer, uses a connector class from the \kafka client library to receive messages from a \kafka broker.
-The class in the client library that reads messages from a broker is called a \texttt{consumer}. So in terms of what is in the source code, the message \kfsubscriber receives messages by calling the read method of a \kafka \texttt{consumer}.
-Again, it is important to keep in mind that the class in the client library is not a \kfconsumer, it is just a connector. The whole message handling component is the \kfconsumer, making use of a connector class from the \kafka client library to receive messages from a broker.
+Similarly on the receiving side, a \kfsubscriber, or \kafka \kfconsumer, uses a connector class from the \kafka client library to receive messages from a \kafka broker.
+The class in the client library that reads messages from a broker is called a \javaname{Consumer}. So in terms of what is in the source code, the message \kfsubscriber receives messages by calling the \javaname{read()} method on a \javaname{Consumer} object.
+Again it is important to keep in mind that the class in the client library is not a \kfconsumer, it is just a connector. The whole message handling component is the \kfconsumer, making use of a connector class from the \kafka client library to receive messages from a \kfbroker.
 
    [broker] -> {(c)C}
 
 \subsection{Message encoding}
 \label{kafka-encoding}
 
-As far as the \kafka service is concerned, the content of the messages is opaque. The \kafka service does not look at the content of messages, it just delivers them.
+As far as the \kafka \kfbroker is concerned, the content of the messages is opaque. The \kafka \kfbroker does not look at the content of messages, it just delivers them.
+The \kfbroker handles messages as simple arrays of bytes, regardless of their content.
 
-The actual messages themselves are handled as arrays of bytes, regardless of their content.
+\subsection{Avro encoding}
+\label{avro-encoding}
+
 It is fairly common pattern to use the 
 \avro serialization format to encode messages handled by \kafka.
 There are strong links between the \kafka and \avro development 
@@ -1752,31 +1762,33 @@ However using one does not require the use of the other.
 
 Using \avro to encode the message content requires the \kfpublisher and \kfsubscriber to share information about the message schema to enable the recipient to decode the binary bytes back into usable message content.
 
+However the \kafa \kfbroker itself does not provide any support for sharing metadata about the message schema. \kafka is not directly linked to \avro and the \kfbroker cannot see inside the messages. It is up to us, the system developers, to figure out how to share metadata about the message schema with the \kfproducers and \kfconsumers. 
+
 There are three main patterns used to share information about the message schema between \kfproducer and \kfconsumer.
 
 \subsubsection{Static shared schema}
 \label{avro-static-schema}
 
-The simplest method is to fix the message schema beforehand, and give both \kfproducer and \kfconsumer a static copy of the schema.  In this scheme, the binary messages are transmitted as-is, without any additional metadata about the schema used to encode the content.
+The simplest method is to fix the message schema beforehand, giving both \kfproducer and \kfconsumer a static copy of the schema.  In this method the  messages are transmitted as-is, as binary arrays, without any additional metadata about the schema.
 
 This works for simple test systems, but it is inherently fragile and will break the first time that we add a new  \kfproducer that uses a slightly different schema.
 
-There is enough built-in error checking the \avro serialization encoding for a client to be able to validate a message against a message schema. However the validation process costs a lot in compute time and resources, and in the end all it can give you is an error that indicates the message does not match the expected schema. It can't tell you anything more about what the message does contain.
+There is enough built-in error checking in the \avro serialization encoding for a client to be able to validate a message against a message schema. However the validation process costs a significant amount of compute resources, and in the end all it can give you is a simple yes/no test to indicate whether the message matches the expected schema. It can't tell you anything more about what the message contains.
 
-In reality, systems that use a static shared schema rely on an external process to ensure the \kfproducer and \kfconsumer use the correct schema, and don't bother to validate incoming messages because of the cost in processing time.
+In reality most systems that use a shared static schema rely on an external process to ensure the \kfproducer and \kfconsumer use the correct schema. Again, this works for simple test systems, but it is inherently fragile and does not scale to handle lots of different types of messages.
 
 \subsubsection{In-line schema}
 \label{avro-inline-schema}
 
-An alternative method is to embed the schema into the header for each message.
-In this format, every message carries a copy of its schema serialized as a plain text \json\footurl{https://www.json.org/} document.
+The in-line method embeds the schema into the header for each message.
+Every message includes a full copy of the message schema, serialized as a plain text \json\footurl{https://www.json.org/} document.
 
-This means that the messages are self-describing. A client does not need to know about the message schema beforehand, it can use the embedded schema to \deserz a message into a generic self-describing structure when it arrives.
+    [[diagram]]
 
-However, embedding the schema in every message adds a non-trivial overhead, particularly if the stream only contains a small number of well known message types.
-Firstly, in order to be readable by any client, the schema has to be transmitted as plain text. This adds a small overhead to the number of bytes that need to be transmitted for every message.
+This means that all the messages are self-describing. A client does not need to know about the message schema beforehand, it can use the embedded schema to \deserz a message into a generic structure on the fly.
 
-In the current ZTF stream, every message needs to have a copy of the following four schema files:
+However, embedding the schema in every message adds a non-trivial overhead, particularly if the \kfstream only contains a small number of well known message types.
+In the current ZTF \kfstream, every message carries with it a copy of all four schema files:
 
 \begin{itemize}
   \item alert.avsc (1094 bytes)
@@ -1785,52 +1797,78 @@ In the current ZTF stream, every message needs to have a copy of the following f
   \item prv candidate.avsc (6565 bytes)
 \end{itemize}
 
-This adds an overhead of 22679 bytes to every message. Scale that up to the ~1kHz to 10kHz data rate expected from LSST and this represents a continuous load of ~20 bytes to ~200 Mbytes per second to re-transmit information the client already knows.
+This adds an overhead of 22,679 bytes to every message. Scale that up to the 10kHz data rate expected from LSST and this represents a continuous load of over 220 Mbytes per second to re-transmit information the client already knows.
 
-Secondly, sending the schema with the message means the message is self describing, but it also means that the client is encountering the message structure for the first time every time it receives a new message.
-The client is unable to apply any form of optimisation to the decoding process, it has to \deserz the message into a generic object structure that is both inefficient to construct and inefficient to use.
+Sending the schema with the message means the message is self describing, but it also means that the client is encountering the structure for the first time every time it receives a message. If the client is \deserzing messages on the fly using the schema from the message header, then the the client is unable to apply any form of optimisation to the decoding process. It has to \deserz the message into a generic object structure that is inefficient to construct and inefficient to use.
 
-The current ZTF message handling uses both of these methods.
-The upstream ZTF broker is sending a full copy of the schema in the header of every message, but the client software is ignoring this and using a compiled \deserzer built from a static copy of the schema embedded in the client source code, which means the client software will fail when it encounters changes in the message structure.
+The current ZTF message handling uses a combination of both the static schema and inline schema methods.
+The upstream ZTF \kfproducer is sending a full copy of the schema in the header of every message, but not all of the clients are making use of this. 
+Some of the clients ignore the schema in the header and use a \deserzer built from a static copy of the schema embedded in the client source code, leaving them vulnerable to changes to the message schema from the upstream \kfproducer.
 
 \subsubsection{Schema registry}
 \label{avro-schema-registry}
 
 The third option is to use an external registry to associate the message schema with a simple identifier based on a fingerprint hash of the schema content. This identifier is sent in the message header, replacing the full schema with a simple numeric value.
 
-The client software starts out with a set of compiled \deserzers for known message structures.
-These \deserzers are built at compile time from static copies of the schema and can be optimised to generate fully qualified object classes that directly represent the message structure.
+The client software contains a set of compiled \deserzers for known message structures.
+These \deserzers are built from static copies of the schema and can be optimised to generate fully qualified object classes that directly represent the message structure.
+
+If the upstream \kfproducer produces a message based on one of these known message types, then the client will recognise the schema identifier and use it to load the corresponding \deserzer to \deserz the message into an object.
 
 If the upstream message \kfproducer introduces a new type of message, one that is not in the client's library of schema, then the client can detect this and has the option to take action to fix the problem.
 
-\confluent have defined a REST \webservice interface for a schema registration service \footurl{https://www.confluent.io/confluent-schema-registry/} that allows \kfproducers to upload and register their message schema and get a numeric identifier.
-If a \kfproducer uses a schema registry to generate the identifier sent in the message header, and the client \kfconsumer is configured to use the same registry service, then the \kfconsumer can use the registry to resolve the identifier and download a copy of the schema.
-The \kfconsumer can use this downloaded schema to create a generic \deserzer that can cope with the new message structure.
-This \deserzer will not be as efficient as the compiled \deserzers used for known schema, but it gives the client the option of being able to handle new message types without having to ship a full copy of the schema with each message.
+\confluent have defined a wire format\footurl{https://docs.confluent.io/current/schema-registry/serdes-develop/index.html#wire-format} for embedding schema identifiers at the beginning of a message.
+
+The format starts with a single byte to represent the serialization format version (zero in the current version) followed by four bytes for the schema identifier and then the rest of the message body.
+
+\begin{table}[h]
+\begin{tabulary}{\linewidth}{|L|L|L|}
+\hline
+\textit{Byte} & \textit{Field} & \textit{Description} \\
+\hline
+0 & Magic Byte & Confluent serialization format version number; currently always 0. \\
+\hline
+1-4 & Schema ID & Four byte schema ID from the \schemaregistry. \\
+\hline
+5+ & Data & Serialized data for the specified schema format (e.g. binary encoding for Avro or Protocol Buffers). \\
+\hline
+\end{tabulary}
+\end{table}
+
+\confluent also have defined a REST \webservice interface for a \schemaregistry \footurl{https://www.confluent.io/confluent-schema-registry/}
+that provides a platform for \kfproducers and \kfconsumers to register and resolve information about message schema.
+
+A \kfproducer can upload their message schema to the REST service to register it and get a unique numeric identifier in return. This identifier can be sent in the message header.
+
+If a \kfconsumer is configured to use the same registry service, then the first time it encounters a message with a schema identifier it does not recognise it can call the \schemaregistry service to resolve the schema identifier and download a copy of the schema.
+
+The \kfconsumer can use this downloaded schema to create a generic \deserzer that can \deserz with the message structure.
+
+In effect this is an indirect version of the in-line schema pattern. Using the \schemaregistry to transfer a copy of the message schema from the \kfproducer to the \kfconsumer. However, this only has to be done once, when the \kfconsumer first encounters a message with this schema identifier. For subsequent messages with the same schema identifier, the \kfconsumer can use the local cached copy of the schema and corresponding \deserzer.
+
+This reduces the transmission overhead from 22,000 extra bytes to 5 bytes per message, 1 for the schema version and 4 bytes for the schema identifier. It also means the \kfconsumer does not have to construct a new \deserzer every time, it can re-use a cached \deserzer linked to the schema identifier.
 
 This scheme works well to create flexible \kfconsumers that can handle any message structure and is used extensively by the \confluent tools and services like the \confluent Connect \footurl{https://docs.confluent.io/current/connect/index.html} components and the the \confluent Platform \footurl{https://www.confluent.io/product/confluent-platform} components.
 
-The schema registration service is designed to manage all the schema for an entire organisation, including support for deploying a distributed registry service that functions across more than one data center.
+The \schemaregistry service is designed to manage the schema for an entire organisation, including support for deploying a distributed registry service that functions across more than one data center.
+However, this pattern does not work for managing schema across multiple organisations.
 
-However, on its own it does not work as well for managing schema across multiple organisations.
 The first problem is that the schema identifier is just a single 32bit integer, assigned by the central registry service for the organisation. This identifier is guaranteed to be be unique within the host organisation, but as far as we know there is no way of extending this to span multiple organisations.
 The second problem is that the message header only contains the 32bit numeric identifier, it does not contain any information about which registry service to use to resolve this identifier.
-The scheme relies on the \kfproducers and \kfconsumers within an organisation all being configured with the endpoint address of the \schemaregistry they should use to register and resolve schema and schema identifiers.
-
-Putting these two issues together means that within an organisation \kfproducers and \kfconsumers can use this system to exchange messages with flexible message schema. However, the scheme does not scale to be able to register and resolve schema and schema identifiers across separate organisations.
+The pattern relies on the \kfproducers and \kfconsumers within an organisation all being configured with the endpoint address for the \schemaregistry service, which does not scale to register and resolve schema across separate organisations.
 
 For example, within a single organisation all of the \kfproducers and \kfconsumers are configured to use a single central \schemaregistry by setting the endpoint URL \texttt{http://registry.example.org/}.
-When a \kfproducer starts to send messages it first checks the registry to see if the schema it is going to use has been registered. If the schema has not been registered yet the \kfproducer uploads a \json encoded copy of the schema and in return receives a new unique identifier for the schema, e.g. 27.
+When a \kfproducer starts to send messages it first checks the registry to see if the schema it is going to use has been registered. If the schema has not been registered the \kfproducer uploads a \json encoded copy of the schema and receives a new unique identifier for the schema, e.g. 27.
 
-The first time a \kfconsumer receives a message with schema identifier 27 in the header it can use the \schemaregistry to resolve this identifier into a \json encoded copy of the schema and use that to generate a \deserzer to handle the new  message structure.
+The first time a \kfconsumer receives a message with this schema identifier in the message header it can use the \schemaregistry to resolve this identifier into a \json encoded copy of the schema and use that to generate a \deserzer to handle the new  message structure.
 This works because both the \kfproducer and \kfconsumer have been configured to use the same \schemaregistry endpoint address to register and resolve schema.
 
-However if the \kfproducer and \kfconsumer are in different organisations, then when the \kfconsumer receives a message with schema identifier 27 in the header it has no way of discovering which \schemaregistry it should use to resolve the identifier and get a copy of the original schema.
+However if the \kfproducer and \kfconsumer are in different organisations, then when the \kfconsumer receives a message with schema identifier 27 in the header it has no way of discovering which \schemaregistry it should use to resolve the identifier to get a copy of the original schema.
 
 The \confluent system does support deploying a distributed \schemaregistry across multiple physical data centers\footurl{https://docs.confluent.io/current/schema-registry/multidc.html}, by configuring one \schemaregistry as the primary registry and the other registries as secondary or slave registries.
-The secondary or slave registries pass new schema back to the primary registry for registration, centralising the  generation of identifiers and ensuring they remain unique within the organisation.
+The secondary or slave registries must pass all new schema back to the primary registry for registration, centralising the  generation of identifiers and ensuring they remain unique within the organisation.
 
-The requirement for the secondary or slave registries pass new schema back to the primary registry for registration means that while this model may work for multiple (\textasciitilde 10) data centers within an organization, it is unlikely to scale to include a multi-level hierarchy of (\textasciitilde 100) different organizations within the astronomy domain.
+Passing new schema back to the primary registry for registration means that while this model may work for multiple (\textasciitilde 10) data centers within an organization, it is unlikely to scale to include a multi-level hierarchy of (\textasciitilde 100) different organizations within the astronomy domain.
 If all of the secondary registries are required to register their schema with the top level primary registry, then the \lsst project would become the de facto central \schemaregistry for the entire astronomy domain, which is a responsibility are unlikely to want to take on. 
 
 At the time of writing, the \lsst project had not decided on what methods they would eventually adopt for managing version control for their message schema. However a number of their design documents refer to the \confluent \schemaregistry as a possible solution.
@@ -1854,31 +1892,13 @@ The first part of the solution is to deploy a local instance of the \confluent \
 
 We would then need to create a mapping between schema identifiers in messages from from the upstream \lsst \kfbroker and the corresponding schema identifiers in our own \schemaregistry.
 
-This could be handled by deploying a gateway \kfbroker, a modified form of the mirror maker service that translates schema identifiers on the fly as it imported messages from the upstream \lsst \kfbroker into the \lsstuk system.
+This could be handled by deploying a modified form of the mirror maker service already in use as part of the \stageone buffer.
+This gateway service would maintain a mapping between schema identifiers from the upstream \lsst \kfbroker and those in the local \lsstuk \schemaregistry and translate the schema identifiers on the fly as it imported messages from the upstream \lsst \kfbroker into the \lsstuk system.
 
-If the \lsst project do decide to use the \confluent \schemaregistry to manage schema versions, then their messages will be transmitted on the wire using the \confluent wire format.\footurl{https://docs.confluent.io/current/schema-registry/serdes-develop/index.html#wire-format}
-
-This consists of a single byte to represent the serialization format version (zero in the current version), followed by four bytes for the schema identifier and then the rest of the message body.
-
-\begin{table}[h]
-\begin{tabulary}{\linewidth}{|L|L|L|}
-\hline
-\textit{Byte} & \textit{Field} & \textit{Description} \\
-\hline
-0 & Magic Byte & Confluent serialization format version number; currently always 0. \\
-\hline
-1-4 & Schema ID & Four byte schema ID from the \schemaregistry. \\
-\hline
-5+ & Data & Serialized data for the specified schema format (e.g. binary encoding for Avro or Protocol Buffers). \\
-\hline
-\end{tabulary}
-\end{table}
-
-The \lsstuk gateway \kfbroker would maintain a mapping between schema identifiers from the upstream \lsst \kfbroker and the internal \lsstuk \schemaregistry.
-The gateway \kfbroker would read the four byte schema identifier from each message and check for a corresponding schema in the local \schemaregistry. If it did not find a matching schema then it would call the upstream \schemaregistry to resolve the schema identifier, download a \json encoded copy of the schema and then register the new schema in the local \schemaregistry. This would generate a new identifier, valid for the local domain.
+The gateway service would read the four byte schema identifier from each message and check for a corresponding schema in the local \schemaregistry. If it did not find a matching schema then it would call the upstream \schemaregistry to resolve the schema identifier, download a \json encoded copy of the schema and then register the new schema in the local \schemaregistry. This would generate a new identifier, valid for the local domain.
 The gateway \kfbroker can then replace the four byte schema identifier in each message from the upstream \kfbroker with the corresponding local identifier from the local \schemaregistry before it passes the message on to the \lsstuk \kfbroker system.
 
-Using a gateway \kfbroker like this enables the \lsstuk project to maintain an internal \schemaregistry which provides version control for all of the message schema used within the \lsstuk system. This would include copies of schema published by the upstream \kfbroker and the internal schema generated by dynamic database queries and filtering components within the \lsstuk system.
+Using a gateway \kfbroker like this enables the \lsstuk project to maintain a local \schemaregistry to provide version control for all of the message schema used within the \lsstuk system. This would include copies of schema published by the upstream \kfbroker and the internal schema generated by dynamic database queries and filtering components within the \lsstuk system.
 
 
 
