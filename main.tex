@@ -711,6 +711,8 @@ This interface based design enables us to apply the same set of test conditions 
 
 \clearpage
 
+---- DELETE THIS ---
+
 The test framework around this is split into two sets of nested loops, the outer data generation loops and the inner \crossmatch selection loops.
 
 The \crossmatch tests are centred on a target position for each test run, configured using the \texttt{target.ra} and \texttt{target.dec} configuration properties.
@@ -882,7 +884,32 @@ The configuration for the inner loop enables us to change the following properti
     \item The number of times the search is repeated.
 \end{itemize}
 
+---- DELETE THIS ---
+
 \clearpage
+
+---- NEW SECTION ---
+
+Summary
+
+Testing was done in two phases.
+Initial set of tests established that we could get the algorithms to work.
+Initial tests showed a significant difference between algorithms.
+However the algorithms were implemented in separate code bases (Maven projects), so the test environment was not the same.
+Subsequent re-testing using the same code base and same test conditions showed less of a difference between the algorithms.
+Difference is still there, advantage to zones, but it is not as strong and depends on conditions.
+Zones is sensitive to zone size and search radius.
+
+Details
+
+Original results
+Retesting results
+Graphs
+
+
+
+
+
 
 
 
@@ -1674,6 +1701,28 @@ If we use our own components for the the user facing API, then we can control wh
 4) Using a mapping between our component configuration interface and the underlying technologies means it will be easier to make our components portable across a range of different platforms.
 
 Ideally we would want a researcher to be able to experiment with developing their workflow components on their desktop or laptop, and then be able to deploy the same workflow onto a cloud compute platform without having to make any code changes.
+
+\subsubsection{Updates}
+\label{workflow.updates}
+
+Original experiments were done in 2018, main text of the report in 2019. 
+Updating this in 2020 we know a lot more about several of the deployment and orchestrations tools that are available.
+Specifically, Ansible, Terraform and Kubernetes.
+All of which will play a pivotal role in the development of the platform.
+All three of them, to different extents, describe systems in a declarative way.
+Terraform and Kubernetes employ YAML documents that describe the required state of the system, and the tools figure out how to implement it.
+Knowing what we know now, strengthens the case for the ideas described in the preceding section.
+1) Using a declarative description of the desired workflow is a good way to enable users and administrators to construct the workflows they want.
+2) Containerised components will play a significant role.
+3) The \lsstuk project should develop their own YAML grammar for describing the workflows.
+4) The technology is evolving rapidly, and the project needs to be able to adapt as new tools and methods become available. Exposing a specific tools to end users e.g. Ansible would make it harder to move to an alternative e.g. Terraform.
+
+
+
+
+
+
+
 
 \section{Kafka experiments}
 \label{kafka-compendium}
