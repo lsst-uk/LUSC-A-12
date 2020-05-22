@@ -6,6 +6,7 @@
 %\graphicspath{ {./images/} }
 
 \usepackage{svg}
+\usepackage{float}
 \usepackage{amsmath} 
 \usepackage{tabulary} 
 
@@ -1777,11 +1778,12 @@ The choice of which messages belong to which \kftopics is not made by the \kfbro
 In \kafka terminology the \kfpublisher component of the publish-subscribe pattern is called a \kfproducer, and a \kfsubscriber component is called a \kfconsumer.
 
 At the implementation level, a \kfpublisher uses a connector class from the \kafka client library to send messages to a \kafka broker.
-Unfortunately the connector class in the client library also called a \javaname{Producer}. So in terms of what is in the source code, a message \kfpublisher sends its messages by calling the \javaname{write()} method on a \javaname{Producer} object.
+The connector class in the client library also called a \javaname{Producer}. So in terms of what is in the source code, a message \kfpublisher sends its messages by calling the \javaname{write()} method on a \javaname{Producer} object.
 This quirk of naming can cause some confusion when talking about \kfproducers and \kfconsumers.
 It is important to keep in mind that the class in the client library is not a \kfproducer, it does not produce messages, it is just a connector. The whole message generating component is the \kfproducer, which makes use of a connector from the \kafka client library to send messages to a \kfbroker.
 
    {P(p)} -> [broker]
+
 
 Similarly on the receiving side, a \kfsubscriber, or \kafka \kfconsumer, uses a connector class from the \kafka client library to receive messages from a \kafka broker.
 The class in the client library that reads messages from a broker is called a \javaname{Consumer}. So in terms of what is in the source code, the message \kfsubscriber receives messages by calling the \javaname{read()} method on a \javaname{Consumer} object.
@@ -1811,7 +1813,7 @@ However using one does not require the use of the other.
 
 Using \avro to encode the message content requires the \kfpublisher and \kfsubscriber to share information about the message schema to enable the recipient to decode the binary bytes back into usable message content.
 
-However the \kafa \kfbroker itself does not provide any support for sharing metadata about the message schema. \kafka is not directly linked to \avro and the \kfbroker cannot see inside the messages. It is up to us, the system developers, to figure out how to share metadata about the message schema with the \kfproducers and \kfconsumers. 
+However the \kfbroker itself does not provide any support for sharing metadata about the message schema. \kafka is not directly linked to \avro and the \kfbroker cannot see inside the messages. It is up to us, the system developers, to figure out how to share metadata about the message schema with the \kfproducers and \kfconsumers. 
 
 There are three main patterns used to share information about the message schema between \kfproducer and \kfconsumer.
 
@@ -1977,42 +1979,40 @@ Using a gateway \kfbroker like this enables the \lsstuk project to maintain a lo
 
 
 
-\subsection{Kafka data storage}
+\subsection{Kafka replication}
 \label{kafka-data-storage}
 
-A \kafka server stores data for a topic as a set of log files, one for each partition.
-The total number of log files is set by the number of partitions, multiplied by the replication factor set for that topic.
-If a topic has four partitions, and a replication factor of three, then the data will be spread across twelve files.
+A \kafka server stores data for a topic as a set of log files which are split into partitions and distributed across the servers in a cluster.
+
+The number of partitions is set by the client when the topic is created and the \javaname{Producer} class from the client library is responsible for distributing the data across the partitions.
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics{images/kafka-partitions-01.png}
+%\includesvg{images/kafka-partitions-01.svg}
+\caption{Client \javaname{Producer} distributes messages to partitions}
+\label{fig:kafka-partitions-01}
+\end{center}
+\end{figure}
+
+\clearpage
+The total number of log files is set by the number of partitions multiplied by the replication factor set for that topic.
+If a topic has four partitions, and a replication factor of three, then the data will be spread across twelve log files.
 If this topic is served by four servers, then each server will be allocated three of the twelve files.
 
-\begin{itemize}
-    \item server-s1
-    \begin{itemize}
-        \item partition-p1
-        \item partition-p2
-        \item partition-p3
-    \end{itemize}
-    \item server-s2
-    \begin{itemize}
-        \item partition-p1
-        \item partition-p2
-        \item partition-p4
-    \end{itemize}
-    \item server-s3
-    \begin{itemize}
-        \item partition-p1
-        \item partition-p3
-        \item partition-p4
-    \end{itemize}
-    \item server-s4
-    \begin{itemize}
-        \item partition-p2
-        \item partition-p3
-        \item partition-p4
-    \end{itemize}
-\end{itemize}
+The \javaname{Producer} client connector writes each partition to one server. Replicating the data to the other servers in the cluster is handled internally by server to server transfers.
 
-I we loose one of the machines, server-s2 for example, then the system still has two copies of each of the three partition files that were on server-s2.
+\begin{figure}[H]
+\begin{center}
+\includegraphics{images/kafka-partitions-03.png}
+%\includesvg{images/kafka-partitions-03.svg}
+\caption{Client \javaname{Producer} distributes messages to partitions}
+\label{fig:kafka-partitions-01}
+\end{center}
+\end{figure}
+
+\clearpage
+I we loose one of the machines, server-s2 for example, the system still has two copies of each of the three partition files that were on server-s2.
 
 \begin{itemize}
     \item partition-p1 is on server-s1 and server-s3
@@ -2020,16 +2020,25 @@ I we loose one of the machines, server-s2 for example, then the system still has
     \item partition-p4 is on server-s3 and server-s4
 \end{itemize}
 
-If we replace server-2 with a new blank machine, then the three missing files will be re created using data from the other machines.
+If we replace server-2 with an empty machine, the three missing log files can be recovered using data from the other servers.
 
-This partitioning and duplication of the data is essential to the way that Kafka operates,
-and provides much of the performance and reliability benefits of Kafka.
-However, the same partitioning and duplication can also cause a number of
-side effects that we need to be aware of.
+\begin{figure}[H]
+\begin{center}
+\includegraphics{images/kafka-partitions-04.png}
+%\includesvg{images/kafka-partitions-04.svg}
+\caption{Missing data recovered from replicas}
+\label{fig:kafka-partitions-01}
+\end{center}
+\end{figure}
 
+\clearpage
 
 \subsection{Kafka partitions}
 \label{kafka-partitions}
+
+The partitioning and replication of data is essential to the way that Kafka operates, and provides much of the performance and reliability benefits of Kafka.
+However, the same partitioning and duplication can also cause a number of
+side effects that we need to be aware of.
 
 One of the issues that needs to be considered for a Kafka deployment is the number of partitions that the data for a topic is split into.
 
