@@ -2040,45 +2040,56 @@ The partitioning and replication of data is essential to the way that Kafka oper
 However, the same partitioning and duplication can also cause a number of
 side effects that we need to be aware of.
 
-One of the issues that needs to be considered for a Kafka deployment is the number of partitions that the data for a topic is split into.
+One of the issues that needs to be considered is the number of partitions for a topic. If we consider an example configuration of a \kfproducer connected to a set of four servers.
 
-The number of partitions assigned to a topic directly influences
-the level of concurrency available to downstream processing nodes.
+If the topic only has three partitions, the \kfproducer will distribute the data to each of the three partitions in turn.
 
-Spreading data across partitions is not done by the services.
-The spread across partitions is performed by the upstream producer that writes
-the data to the service.
+If we simplify the distribution process to a round-robin selection, then the first block of messages will be sent to partition one on the first server, the second block is sent to partition two on the second server, and the third block is sent to partition three on the third server.
 
-When a client producer writes data to a service, it first requests
-the number of partitions assigned to the topic by querying the
-server to request the topic configuration.
+The fourth block is not sent the fourth server because we only have three partitions.
+The fourth block is sent to partition one on the first server, the fifth to partition two on the second server and the sixth block to partition three on the the third server.
 
-If we start with an example configuration of one producer connected to
-a set of four servers.
+\begin{figure}[H]
+\begin{center}
+\includegraphics{images/kafka-partitions-05.png}
+%\includesvg{images/kafka-partitions-05.svg}
+%\caption{Client \javaname{Producer} distributes messages to partitions}
+\label{fig:kafka-partitions-05}
+\end{center}
+\end{figure}
 
-If the topic that the producer is writing to is configured with only three partitions,
-then the producer will split the data into blocks and send them to one of three
-partitions in turn.
-
-The first block will be sent to partition one on the first server, the second block is sent to
-partition two on the second server, and the third block is sent to partition three on the third server.
-
-The fourth block is sent to partition one on the first server,
-the fifth to partition two on the second server and the sixth block to partition three on the the third server.
-
-In this simple configuration, with more servers than partitions, the fourth server
-does not have any partitions allocated to it.
-In reality, the replication factor would normally be greater than one, so internal
-replication would spread copies of the data between the four servers, including
-the fourth service.
-However, to simplify this example we are only tracking the primary copies for
-each partition and not the replicas.
+In this simple configuration, with more servers than partitions, the fourth server does not have any partitions allocated to it.
+In reality, the replication factor would normally be greater than one, so internal replication would spread copies of the data between the four servers, including the fourth service.
+However, to simplify this example we are only tracking the primary copies for each partition and not the replicas.
 
 If we increase the partition count to four, then the partitions are spread
 evenly across all four servers.
 
-With five partitions, then three of the four servers would have one partition each,
-and one of the servers would have two partitions.
+\begin{figure}[H]
+\begin{center}
+\includegraphics{images/kafka-partitions-06.png}
+%\includesvg{images/kafka-partitions-06.svg}
+%\caption{Client \javaname{Producer} distributes messages to partitions}
+\label{fig:kafka-partitions-06}
+\end{center}
+\end{figure}
+
+With five partitions, then three of the four servers would have one partition each, and one of the servers would have two partitions.
+
+With six partitions, then two of the have two partitions and two of the servers have one partition.
+
+\begin{figure}[H]
+\begin{center}
+\includegraphics{images/kafka-partitions-08.png}
+%\includesvg{images/kafka-partitions-08.svg}
+%\caption{Client \javaname{Producer} distributes messages to partitions}
+\label{fig:kafka-partitions-07}
+\end{center}
+\end{figure}
+
+
+
+
 
 As the number of partitions increases, the data is spread more evenly across the servers.
 
@@ -2089,26 +2100,21 @@ With one hundred and twenty five partitions, three of the four servers would hav
 partitions, and one of the servers would have thirty two partitions.
 
 
-With data being written into our service, we can now look at
-how the data is sent to downstream consumers.
+With data being written into our service, we can now look at how the data is sent to downstream consumers.
 
 Starting with the first example, three partitions spread across four servers.
-If we have a single consumer, then data from all four partitions are sent to the
-same consumer.
+If we have a single consumer, then data from all four partitions are sent to the same consumer.
 
-If we have two consumers, the first consumer would be sent data for one partition,
-and the second consumer would be sent data for two partitions.
+If we have two consumers, the first consumer would be sent data for one partition, and the second consumer would be sent data for two partitions.
 
 If we have three consumers, then each consumer handles data from one partion.
 
-If we have four consumers, then three of the consumers each handle data one partion,
-and the fourth consumer does not receive any data.
+If we have four consumers, then three of the consumers each handle data one partition, and the fourth consumer does not receive any data.
 
 Increasing the number of consumers beyond the number of partitions
 results in idle consumers with no data sent to them.
 
-This limits the level of concurrency that the downstream component can be configured with.
-With three partitions, then the system will only send data to three consumers.
+This limits the level of concurrency that the downstream component can be configured with. With three partitions, then the system will only send data to three consumers.
 Adding more consumers running in parallel will not increase the data throughput.
 
 With twenty five partitions, we can add up to twenty five consumers running in parallel,
