@@ -1,6 +1,7 @@
 \documentclass{article}
 \usepackage[utf8]{inputenc}
 \usepackage[multiple]{footmisc}
+\usepackage[a4paper, total={6in, 8in}]{geometry}
 
 %\usepackage{graphicx}
 %\graphicspath{ {./images/} }
@@ -10,9 +11,9 @@
 \usepackage{amsmath} 
 \usepackage{tabulary} 
 
-\title{LUSC-A-12 LSST:UK phase A alert handling and cross match experiments}
+\title{LUSC-A-12 LSST:UK phase A alert handling infrastructure experiments}
 \author{D. Morris}
-\date{September 2019}
+\date{June 2020}
 
 \setlength{\parskip}{1em}
 
@@ -245,6 +246,7 @@
 %https://academia.stackexchange.com/a/20999
 %https://github.blog/2014-05-14-improving-github-for-science/
 %https://guides.github.com/activities/citable-code/
+\clearpage
 
 \tableofcontents
 \clearpage
@@ -292,7 +294,7 @@ The \textit{transN} value sets the number of alerts per visit, this combined wit
 
 To meet the scalability and fault tolerance requirements we developed a micro-service\footurl{https://microservices.io/} based design for the alert processing system, where multiple instances of each component can be deployed in parallel, using \kafka\footurl{https://kafka.apache.org/} to distribute the alerts between components in the pipeline.
 
-Our initial reason for selecting \kafka as the message transport technology was informed by the work done by M. Patterson\cite{Patterson_2018} and colleagues developing the alert processing infrastructure for the Zwicky Transient Facility (ZTF)\footurl{https://www.ztf.caltech.edu/} project.
+Our initial reason for selecting \kafka as the message transport technology was informed by the work done by M. Patterson\cite{Patterson-2018} and colleagues developing the alert processing infrastructure for the Zwicky Transient Facility (ZTF)\footurl{https://www.ztf.caltech.edu/} project.
 
 The \ztf alert processing infrastructure is considered a prototype for the \lsst alert processing infrastructure, which is planning to use a similar \kafka based system as the primary distribution protocol for the \lsst level 1 alert stream.
 
@@ -375,7 +377,7 @@ Based on our experience of working with the tools and client libraries provided 
 
 \subsection{Stage 2, workflow components}
 \label{stage-2}
-The second stage of processing consists of a set of loosely coupled components that consume data from a \kfstream, apply a filter or processing step, and produce a new \kfsstream of results.
+The second stage of processing consists of a set of loosely coupled components that consume data from a \kfstream, apply a filter or processing step, and produce a new \kfstream of results.
 
 \kafka is designed to distribute messages to multiple clients reading messages from the same \kfstream at different speeds. This means we can have multiple different components subscribed to the output of the \stageone buffer processing the messages at different rates without interfering with each other.
 
@@ -678,14 +680,14 @@ Given an initial point at the center. The first pass of the algorithm will add e
 \begin{figure}[h]
 \includesvg{images/data-count-01.svg}
 \caption{$n=1 \ :\ ((2^n)+1)^2 = 3^2 = 9 \ points, 1 \ match$}
-\label{fig:data-count-03}
+\label{fig:data-count-01}
 \end{figure}
 
 The second pass will add an additional sixteen points in between the original nine, to create a 5x5 grid of 25 points around the target. 
 \begin{figure}[h]
 \includesvg{images/data-count-02.svg}
 \caption{$n=2 \ :\ ((2^n)+1)^2 = 5^2 = 25 \ points, 9 \ matches$}
-\label{fig:data-count-03}
+\label{fig:data-count-02}
 \end{figure}
 
 The third pass will add a further fifty six points to create a 9x9 grid of 81 points around the target. 
@@ -1749,7 +1751,7 @@ The \javaname{Producer} client connector writes each \kfpartition to one server.
 \includegraphics{images/kafka-partitions-03.png}
 %\includesvg{images/kafka-partitions-03.svg}
 \caption{Client \javaname{Producer} distributes messages to \kfpartitions}
-\label{fig:kafka-partitions-01}
+\label{fig:kafka-partitions-03}
 \end{center}
 \end{figure}
 
@@ -1769,7 +1771,7 @@ If we replace server-2 with an empty machine, the three missing log files can be
 \includegraphics{images/kafka-partitions-04.png}
 %\includesvg{images/kafka-partitions-04.svg}
 \caption{Missing data recovered from replicas}
-\label{fig:kafka-partitions-01}
+\label{fig:kafka-partitions-04}
 \end{center}
 \end{figure}
 
@@ -1967,7 +1969,7 @@ The way that Kafka is able to handle multiple processes consuming data at differ
 
 When a group of \kfconsumers subscribe to a \kftopic, the \kfbroker assigns the available \kfpartitions to individual \kfconsumers, storing a separate offset pointer the \kfconsumer in each \kfpartition it is allocated.
 
-When the \kfconsumer requests a block of data for a \kfpafrom from a \kfbroker node, the node uses the offset pointer for that \kfconsumer to load the next block of messages for that \kfconsumer.
+When the \kfconsumer requests a block of data for a \kfpartition from a \kfbroker node, the node uses the offset pointer for that \kfconsumer to load the next block of messages for that \kfconsumer.
 
 The server loads the data into a buffer in memory, sends it to the \kfconsumer and waits for an acknowledgment.
 When it receives an acknowledgment from the \kfconsumer, the node increments the offset pointer for that \kfconsumer on that \kfpartition and then loads the next block of data to send.
@@ -1980,7 +1982,7 @@ If we partition the main \kftopic across 224 \kfpartitions, then
 to maximise the processing concurrency each \kfconsumer group would contain 224 individual \kfconsumer processes.
 Each \kfconsumer process would need an offset counter and open file descriptor allocated on the \kfbroker node to read the data for that \kfconsumer.
 
-In order to handle this number of open file descriptors the deployment notes for \kafka recommend increasing the number of available file descriptors from the default value of 1000 on a typical \Linux server to over 100,000\footurl{https://docs.confluent.io/current/kafka/deployment.html#file-descriptors-and-mmap}.
+In order to handle this number of open file descriptors the deployment notes for \kafka recommend increasing the number of available file descriptors from the default value of 1000 for a typical Linux server to over 100,000\footurl{https://docs.confluent.io/current/kafka/deployment.html#file-descriptors-and-mmap}.
 
 The second cost of splitting the data across a large number of \kfpartitions is the amount of resources this consumes on the client.
 If we have 224 \kfpartitions and 224 consumer threads, then in theory each \kfconsumer should only need to handle data for one \kfpartition, or 1/224 of the data.
