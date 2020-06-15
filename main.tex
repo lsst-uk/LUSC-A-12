@@ -41,8 +41,10 @@
 \newcommand{\ansible} {Ansible\xspace}
 \newcommand{\docker} {Docker\xspace}
 \newcommand{\dockercompose} {docker-compose\xspace}
+\newcommand{\terraform} {Terraform\xspace}
+\newcommand{\kubernetes} {Kubernetes\xspace}
 
-\newcommand{\openstack} {OpenStack\xspace}
+\newcommand{\openstack} {Openstack\xspace}
 \newcommand{\dnsmasq} {\texttt{dnsmasq}\xspace}
 \newcommand{\dns} {DNS\xspace}
 \newcommand{\dhcp} {DCHP\xspace}
@@ -94,7 +96,6 @@
 \newcommand{\apache} {Apache\xspace}
 \newcommand{\confluent} {Confluent\xspace}
 
-\newcommand{\kubernetes} {Kubernetes\xspace}
 \newcommand{\virtualbox} {VirtualBox\xspace}
 \newcommand{\vagrant} {Vagrant\xspace}
 \newcommand{\kvm} {KVM\xspace}
@@ -107,9 +108,14 @@
 \newcommand{\hsqldb} {HSQLDB\xspace}
 \newcommand{\cqengine} {CQEngine\xspace}
 \newcommand{\crossmatch} {crossmatch\xspace}
+\newcommand{\dataset} {dataset\xspace}
 
+
+\newcommand{\avschema} {\textit{schema}\xspace}
+\newcommand{\avschemas} {\textit{schema}\xspace}
+\newcommand{\conschemareg} {registry\xspace}
+\newcommand{\conschemaregistry} {Schema Registry\xspace}
 \newcommand{\mirrormaker} {Mirror Maker\xspace}
-\newcommand{\schemaregistry} {Schema Registry\xspace}
 
 \newcommand{\serz}      {serialize\xspace}
 \newcommand{\serzed}    {serialized\xspace}
@@ -306,12 +312,12 @@ The first stage of the system architecture is a local \kafka mirror configured a
 \label{stage-1.local-endpoint}
 Access to the upstream \kafka endpoint provided by \lsst is bandwidth limited, and will be limited to a small group of clients who are allowed to connect. Even if these restrictions are relaxed it will still make sense for each project to only make one connection to the upstream service.
 This is particularly relevant in our case, as our connection to the upstream service involves a trans-Atlantic connection.
-Implementing a mirror of the upstream service will provide a local \kafka endpoint for our other components to connect to, enabling multiple components to connect to the primary input \kafka stream without placing an unnecessary load on our external network connection or the upstream service.
+Implementing a mirror of the upstream service will provide a local \kafka endpoint for the rest of our components to connect to, enabling multiple components to connect to the primary input \kafka stream without placing an unnecessary load on our external network connection or the upstream service.
 
 \subsubsection{Local buffer}
 \label{stage-1.local-buffer}
 Configuring our mirror of the upstream service as a 7 day \fifo buffer, makes our system more resilient to networking issues and component failures.
-If a component in our system fails, the 7 day buffer gives us time to fix the issue, test and restart the failed component using data from our local buffer.
+If a component in our system fails, the buffer gives us time to fix the issue, test and restart the failed component using data from our local buffer.
 
 \subsubsection{Partition count}
 \label{stage-1.partition-count}
@@ -322,12 +328,12 @@ Deploying a buffer at the input to our system give us direct control over the nu
 \label{stage-1.schema-mapping}
 The ZTF and LSST alert messages are encoded using the \apache\avro\footurl{https://avro.apache.org/} binary encoding format. 
 
-In addition to the binary message content, the current live stream from \ztf uses an inline schema to describe the message schema. Every message carries a copy of its schema embedded in the message header \serzed as a plain text \json\footurl{https://www.json.org/} document.
-This means the alert messages are self-describing, and provides some insulation from side effects of schema changes for clients.
-However, embedding the schema in every message adds a non-trivial overhead, particularly if the stream only contains a small number of well known message types.
+In addition to the binary message content, the current live stream from \ztf uses an inline \avschema to describe the messages. Every message carries a copy of its \avschema embedded in the message header \serzed as a plain text \json\footurl{https://www.json.org/} document.
+This means the alert messages are self-describing, and provides some insulation from side effects of \avschema changes for clients.
+However, embedding the \avschema in every message adds a non-trivial overhead, particularly if the stream only contains a small number of well known message types.
 
-Our understanding is that the \lsst project intend to use a service like the \schemaregistry\footurl{https://www.confluent.io/confluent-schema-registry/} to manage their \avro schema, and each message will only include a schema identifier rather than the full schema. This reduces the overhead associated with using an inline schema to describe the messages. However, the schema identifier will be specific to the upstream project's \schemaregistry. This means we will need to provide a mapping from their schema identifiers to the corresponding schema identifiers in our own local \schemaregistry.
-This translation can be handled by the input buffer, replacing the upstream schema identifier with the the corresponding local identifier as it receives the messages.
+Our understanding is that the \lsst project intend to use a service similar to the \confluent \conschemaregistry\footurl{https://www.confluent.io/confluent-schema-registry/} to manage their \avro \avschema, and each message will only include a \avschema identifier rather than the full \avschema. This reduces the overhead associated with using an inline \avschema to describe the messages. However, the \avschema identifier will be specific to the upstream project's \conschemareg. This means we will need to provide a mapping from their \avschema identifiers to the corresponding \avschema identifiers in our own local \conschemareg.
+This translation can be handled by the input buffer, replacing the upstream \avschema identifier with the the corresponding local identifier as it receives the messages. Section \ref{avro-schema-gateway} describes this in more detail.
 
 \subsubsection{Topic merge}
 \label{stage-1.topic-merge}
@@ -338,7 +344,7 @@ Ideally it would be useful to have access to both a single continuous \kfstream 
 Depending on how the live data stream from \lsst is configured, as a single continuous \kfstream or as separate daily \kfstreams, our \fifo buffer can either split the continuous \kfstream into separate \kftopics for the system administration tasks, or merge the separate \kftopics into one continuous \kfstream for our science uses.
 
 By placing our own \fifo buffer at the head of our processing chain we are insulated from changes to the design of the upstream \kfstream from \lsst.
-Our \fifo buffer would handle changes to the \kftopics and schema by the upstream service and present a consistent set of \kftopics and schema to our internal components.
+Our \fifo buffer would handle changes to the \kftopics and \avschema by the upstream service and present a consistent set of \kftopics and \avschema to our internal components.
 
 \subsubsection{Test data}
 \label{stage-1.test-data}
@@ -348,32 +354,27 @@ Example test data:
 \begin{itemize}
   \item Known sets of simulated data for specific scenarios.
   \item Known subsets of historical data from \ztf.
-  \item \ztf data with static, inline and registered schema.
-  \item \lsst data with static, inline and registered schema.
+  \item \ztf data with static, inline and registered \avschema.
+  \item \lsst data with static, inline and registered \avschema.
 \end{itemize}
 
 The advantage of using the same \kafka service to store and serve test data is it means our components can use the same libraries and configuration tools in development, testing and live production.
 
-In order to evaluate this use case we have been experimenting with maintaining a \kafka \kfbroker configured as a rolling 7 day \fifo buffer, using it as source for test data and as a permanent data archive.
+In order to evaluate this use case we have been experimenting with maintaining a \kafka \kfbroker configured both as a rolling 7 day \fifo buffer and as a permanent archive for test data.
 In the process we have learned a lot about configuring and administering a \kafka \kfbroker, which we describe in more detail in Section \ref{kafka-compendium}.
-The key points are :
-\begin{itemize}
-    \item Deploying \kafka as a 7 day \fifo buffer requires very little additional configuration. The default out of the box configuration deploys a simple \fifo buffer.
-    \item Having access to a set of test data is extremely useful for developing processing components. However, if the tests are intended to gather performance statistics, then care is needed to coordinate the tests and isolate them from each other.
-    \item It is possible to configure \kafka as a long term data archive. However, we encountered some issues to do with managing the service and maintaining the data which would suggest that \kafka is probably not the best tool for this. 
-\end{itemize}
 
 To date these experiments have been using the standard \mirrormaker\footurl{https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=27846330} service from the \apache \kafka project.
-In order to provide the additional functionality such as topic merging and schema translation we would need to develop our own implementation of the \mirrormaker service.
+
+In order to provide the additional functionality such as merging \kftopics and translating \avschema identifiers  we would need to develop our own implementation of the \mirrormaker service.
 Based on our experience of working with the tools and client libraries provided by the \apache \kafka project this should be relatively easy to implement.
 
 \subsection{Stage 2, workflow components}
 \label{stage-2}
-The second stage of processing consists of a set of loosely coupled components that consume data from a \kfstream, apply a filter or processing step, and produce a new stream of results.
+The second stage of processing consists of a set of loosely coupled components that consume data from a \kfstream, apply a filter or processing step, and produce a new \kfsstream of results.
 
-\kafka is designed to distribute messages to multiple clients reading messages from the same \kfstream at different speeds. Section \ref{kafka-offsets} describes how \kafka supports this in more detail, but what it means for us is we can have multiple different components subscribed to the output of the \stageone buffer processing the messages at different rates without interfering with each other.
+\kafka is designed to distribute messages to multiple clients reading messages from the same \kfstream at different speeds. This means we can have multiple different components subscribed to the output of the \stageone buffer processing the messages at different rates without interfering with each other.
 
-A mixture of slow, low bandwidth, components gradually working through the alert messages can subscribe to the same \kafka \kfstream as high speed, high bandwidth, components processing the alert messages as fast as possible. The \kafka service takes care of buffering the data so that all of the components get to see all of the alert messages in the right order.
+A mixture of slow, low bandwidth, components gradually working through the alert messages can subscribe to the same \kfstream as high speed, high bandwidth, components processing the alert messages as fast as possible. The \kafka broker takes care of buffering the data so that all of the components get to see all of the messages in the right order.
 
 \subsubsection{High speed components}
 \label{stage-2.high-speed.components}
@@ -387,6 +388,9 @@ Some example high speed processors might include :
 These examples are considered high speed components is because their output will be used as the input for other components, creating a pipeline or workflow.
 They must be able to process the incoming data as fast as it is arriving, producing their results with the minimum latency between input and output.
 In order to meet these requirements, these components are designed to be able to run multiple instances in parallel, increasing the data throughput by processing multiple alert messages at a time.
+
+\subsubsection{Medium speed components}
+\label{stage-2.medium-speed.components}
 
 Some example medium speed components might include :
 \begin{itemize}
@@ -404,12 +408,12 @@ These examples are considered medium speed components because the performance of
 Some example low speed components might include :
 \begin{itemize}
   \item Read alert messages and write them to \avro files for backup.
-  \item Read alert messages and write candidates to \parquet files for downstream \spark analysis.
-  \item Read alert messages, extract the light curves and write them to \fits or \votable files for downstream analysis.
-  \item Read alert messages, extract the images and write them to FITS/PNG/JPEG files for downstream display or analysis.
+  \item Read alert messages and write candidates to \parquet files for analysis using \spark.
+  \item Read alert messages, extract the light curves and write them to \fits or \votable files.
+  \item Read alert messages, extract the images and write them to FITS/PNG/JPEG files.
 \end{itemize}
 
-These examples are considered low speed processors because there is no science case requirement for them to produce results at high speed. Depending on the amount of data processing required by their algorithm they can operate with a small number of concurrent processes.
+These examples are considered low speed processors because there is no science requirement for them to produce results at high speed. Depending on the amount of data processing required by their algorithm they can operate with a small number of concurrent processes.
 
 However, they will still need to be able to meet a minimum level of processing speed in order to process a days worth of data within a day. Based on our experience with \ztf the input data rate is likely to be non-uniform, periods with a very high rate of alerts, and periods with a much lower rate, and the daily totals can vary by several orders of magnitude (from 100 to 1,000,000 alerts per night).
 While the low speed components don't need to be able to match the peak bandwidth of the busy periods, they do need to be able to process the cumulative data from each night fast enough to have completed that night's worth of data before the next night's data begins.
@@ -419,12 +423,12 @@ While the low speed components don't need to be able to match the peak bandwidth
 
 In order to help develop these processors and filters the \lsstuk project should provide a set of Java and Python libraries that implement the support functionality needed to connect to \kafka services, subscribe to \kftopics, read and write messages, \serz and \deserz \avro messages etc.
 
-Using a common set of well tested libraries will help to make our own components easier to develop and more reliable to use. It will also help to lower the barrier to entry for 3rd party developers to create their own processors and filters.
+Providing a common set of well tested libraries will make it easier to build robust and reliable filters and alert processing components, and  will help to lower the barrier to entry for 3rd party developers to create their own processors and filters.
 
 In order to support the \crossmatch tests described in Section \ref{crossmatch-algorithms} we developed a set of Java classes and interfaces that prototype this architecture.
 We also looked at automating the deployment of the components using a common \yaml configuration file syntax that enables non-programmers to connect together stream processing components to build a workflow.
 
-Further details of the Java API and a proposed configuration schema are given in sections \ref{component-libraries.java-interfaces} and \ref{workflow-configuration}.
+Further details of the Java API classes and a YAML schema for configuring them are given in sections \ref{component-libraries.java-interfaces} and \ref{workflow-configuration}.
 
 \subsection{Stage 3, Spark analysis}
 \label{stage-3}
@@ -441,7 +445,7 @@ Based on the results of our research, we expect that it may be possible to meet 
 \section{Deployment platforms}
 \label{deployment-platforms}
 
-The software components developed for the \phasea experiments were deployed twice, once on a set of physical machines at ROE, and again on an \openstack\footurl{https://www.openstack.org/} platform provided by the \uedin IT services.
+The software components developed for the \phasea experiments were deployed twice, once on an \openstack\footurl{https://www.openstack.org/} platform provided by the \uedin IT services and again on a set of physical machines at ROE. 
 
 Using the different systems helped us to learn how to manage service deployments, to evaluate the costs and benefits of the different platforms, and learn how suitable they would be for deploying live production services.
 
@@ -462,9 +466,8 @@ During this work we discovered and solved a number of minor issues involved with
 Some of the key lessons learned were:
 \begin{itemize}
     \item Configuring \kafka as a \fifo buffer is close to the default 'out of the box` configuration.
-    \item Configuring \kafka as a long term archive is possible, but there are issues regarding data management that mean it is probably not the best solution (this is discussed in more detail in Section \ref{kafka-archive}). 
-    \item A \kafka instance will fail fast. If there is anything wrong with the service or its configuration, e.g. out of \hdisk space in a log directory, it will disconnect itself from the \kafka cluster and shut itself down.
-    \item The host names or IP addresses used for the \kafka server endpoint addresses need to be resolvable and accessible from both inside and outside the \openstack system, which can cause problems at the network routing level when using \docker containers inside \openstack (see Section \ref{kafka-hostnames} for more details).
+    \item Configuring \kafka as a long term archive is possible, but there are issues regarding data management that mean it is probably not the best solution for this. 
+    \item A \kafka instance will fail fast. If there is anything wrong with a service node or its configuration, e.g. out of \hdisk space in a log directory, it will disconnect itself from the \kafka cluster and shut itself down.
 \end{itemize}
 
 Mid way through the series of \phasea experiments on \kafka the \eleanor system experienced a number of issues to do with the configuration of the \openstack network components which eventually lead to the platform being shutdown.
@@ -475,13 +478,13 @@ An unintended side effect of this was that we gained experience in trying to mai
 
 As part of our work for \phasea we were involved in specifying and configuring some of the hardware for the \lsstuk \testplatform installed at \roe.
 
-Over the duration of the \phasea work the \testplatform has grown from an initial set of two machines to six machines for the \lsstuk project and two machines for the \gaia \cunine project deployed in the same \datacenter at \roe (with to more expected early in 2020). Setting up a full \openstack deployment for just the two machines available at the start of \phasea did not justify the cost in time and resources it would involve. In fact with just two machines available the \openstack services themselves would have take up a significant portion of the available resources leaving little space left for running the tests.
+Over the duration of the \phasea work the \testplatform has grown from an initial set of two machines to six machines for the \lsstuk project and two machines for the \gaia \cunine project deployed in the same \datacenter at \roe. Setting up a full \openstack deployment for just the two machines available at the start of \phasea did not justify the cost in time and resources it would involve. In fact with just two machines available the \openstack services themselves would have take up a significant portion of the available resources leaving little space left for running the tests.
 
 As a result the development of the \testplatform started with a basic deployment of \libvirt\footurl{https://libvirt.org/} and added layers of tools as and when they were required.
 
 Another reason for not using \openstack to provision resources on the \testplatform is that one of the things we wanted to explore with the local \testplatform is how different configurations of software and hardware effected the system performance. To do this we needed direct control over how and where the resources were allocated and direct access to the underlying system to be able to monitor the performance. 
 
-Given that we now have access to at three different \openstack systems, the \eleanor system managed by \uedin IT services and the \iris systems at \ral and \cam, it made sense to keep the \testplatform for low level experiments with direct access to the physical hardware rather than adding the additional abstraction layers of an \openstack deployment.
+Given that we now have access to at three different \openstack systems, the \eleanor system at \uedin and the \iris systems at \ral and \cam, it made sense to keep the \testplatform for low level experiments with direct access to the physical hardware rather than adding the additional layers of management services that come with an \openstack deployment.
 
 \subsection{\ischnura \libvirt}
 \label{deployment.ischnura-libvirt}
@@ -490,12 +493,12 @@ The current configuration (Q3 2019) of the \testplatform uses a set of command l
 to provision virtual machines on the worker nodes.
 
 The \ischnura tools provide a simple cookie-cutter tool for creating identical virtual machines as quickly as possible.
-However the \ischnura tools only supported basic \libvirt deployments with the user account and ssh keys hard coded into the virtual machine images.
-In order to support deployments on the \eleanor platform using the same virtual machine images we modified the \ischnura tools to use the same \cloudinit\footurl{https://cloud-init.io/} process that is used by \openstack to configure user accounts and ssh keys in new virtual machines.
+When we started this work the \ischnura tools only supported basic \libvirt deployments with the user account and ssh keys hard coded into the virtual machine images.
+In order to make our virtual machine images as portable as possible across both the \openstack systems and the \ischnura based platform we modified the \ischnura tools to use the same \cloudinit\footurl{https://cloud-init.io/} process used by \openstack to configure user accounts and ssh keys in new virtual machines.
 
-This work involved modifying the \ischnura tools to write the details of the admin user account to a \cloudinit configuration file on the host system, wrap the directory containing the configuration file as an ISO9660\footurl{https://en.wikipedia.org/wiki/ISO_9660} image, and mount that as a CDROM device on the new virtual machine. During the boot process the \cloudinit software will check a number of different options for configuration information, including a standard location on the local network or local CDROM device. If it does find \cloudinit configuration data it will use the metadata to configure the admin account, including the list of ssh \texttt{authorized\_keys} and the \texttt{sudo} permissions.
+This work involved modifying the \ischnura tools to write the details of the admin user account to a \cloudinit configuration file on the host system, wrap the directory containing the configuration file as an ISO9660\footurl{https://en.wikipedia.org/wiki/ISO_9660} image, and mount that as a CDROM device on the new virtual machine. During the boot process the \cloudinit software will check a number of different options for configuration information, including a standard location on the local network or local CDROM device. If it finds some \cloudinit configuration data it will use it to configure the virtual machine admin account, including the setting the correct ssh \texttt{authorized\_keys} and \texttt{sudo} permissions.
 
-As a result of this work the administrator account in a new virtual machine will be automatically initialized  with the correct user account and ssh keys whether created using the \ischnura on the \testplatform, at \roe, the \eleanor \openstack system at the \uedin or an \openstack system provided by \iris.
+As a result of this work we can use the same virtual machine image to create identical virtual machines on the \ischnura and \openstack platforms.
 
 \subsection{Network configuration}
 \label{deployment-testbed.network-layers}
@@ -504,13 +507,13 @@ The network configuration for the \testplatform has evolved over the period of t
 
 The initial deployment used the default NAT\footurl{https://en.wikipedia.org/wiki/Network_address_translation} based networking available as part of a standard \libvirt deployment. This works for local services deployed on virtual machines running on the same physical host. As soon as we needed to have components running on different physical hosts we needed to replace this with a network capable of spanning multiple physical machines.
 
-The first iteration of this was to use a \textit{'routed'} network configuration that still used the local \dnsmasq\footurl{http://www.thekelleys.org.uk/dnsmasq/doc.html} service provided by the \libvirt service on each of the physical machines, but configured the \libvirt network to act as a router, making the the virtual machines accessible on the wider network.
+The first iteration of this was to use a routed network configuration that still used the local \dnsmasq\footurl{http://www.thekelleys.org.uk/dnsmasq/doc.html} service provided by the \libvirt service on each of the physical machines, but configured the \libvirt network to act as a router, making the the virtual machines accessible on the wider network.
 To enable name resolution between virtual machines the full set of IP addresses and host names were added to the \texttt{/etc/hosts} file on each physical machine, 
 This was sufficient to enable services and clients on different virtual machines to connect to each other, as long as the physical hosts are connected to the same physical network segment.
-This is quick and easy to set up for a small number of physical machines, but becomes progressively more complex to administer as the number of machines increases.
+This was easy enough to set up for a small number of physical machines, but became progressively more complex to administer as the number of machines increased.
 In theory it would be possible to automate the configuration of this using a deployment tool such as \ansible. However, beyond about two or three physical hosts the law of diminishing returns applies and it was better to spend the resources setting up a full virtual network for the \testplatform.
 
-The third iteration of network configuration for the \testplatform defined a virtual local area network (\vlan)\footurl{https://en.wikipedia.org/wiki/Virtual_LAN} at the level of the \datacenter network switches, which means the physical machines are connected to their own virtual network isolated from the rest of the university systems. The network interface on each physical host is configured as a bridge interface, and the \libvirt network layer is configured to connect network interfaces on the virtual machines directly to the bridge interface on their host. The result is that all of the physical and virtual machines are connected to the same local network, and everyone can 'see' and reach everyone else.
+The third iteration of network configuration for the \testplatform defined a virtual local area network (\vlan)\footurl{https://en.wikipedia.org/wiki/Virtual_LAN} at the level of the \datacenter network switches, which means the physical machines are connected to their own virtual network isolated from the rest of the university systems. The network interface on each physical host is configured as a bridge interface, and the \libvirt network layer is configured to connect network interfaces on the virtual machines directly to the bridge interface on their host. The result is that all of the physical and virtual machines are connected to the same local network but isolated from the rest of the university network.
 
 \subsection{\texttt{dnsmasq} service}
 \label{deployment-testbed.dnsmasq}
@@ -521,7 +524,7 @@ In order to provide the \dhcp\footurl{https://en.wikipedia.org/wiki/Dynamic_Host
 The \docker container deployment uses a vanilla \dnsmasq \docker container published by Storytel\footurl{https://github.com/Storytel/dnsmasq}\footurl{https://hub.docker.com/r/storytel/dnsmasq/dockerfile} and adds the configuration files needed to define a set of MAC addresses, IP addresses and hostnames for the virtual machines.
 
 Although there is no technical requirement to allocate these addresses on a per host basis, we used a template pattern to map specific groups of addresses to the virtual machines running on each physical host.
-This means it is possible to identify which virtual machine is running on which physical machine just by looking at the MAC or IP address. This is extremely useful when trying debug network issues by looking at capture logs of network traffic.
+This means it is possible to identify which virtual machine is running on which physical machine by looking at the MAC or IP address. This is extremely useful when trying debug network issues by looking at capture logs of network traffic.
 
 The \dnsmasq \docker container was originally deployed on one of the \testplatform worker nodes, but it has since been moved to a separate physical machine allocated specifically for this purpose.
 Deploying the \dnsmasq service in a \docker container made this transition much easier, and paid back the original investment in time used to set up the \docker deployment.
@@ -537,10 +540,9 @@ The next stage of work on the \testplatform will be to develop the configuration
 At the time of writing (Q4 2019) much of the configuration and deployment scripts in the \esperia project have been replaced by \ansible playbooks.
 The \ansible playbooks have been extended to include setting the user accounts, ssh \texttt{authorized\_keys} and the \texttt{sudo} permissions on the physical machines. However configuring the primary network interfaces on the physical machines has not yet been implemented as an \ansible playbook. This is partly due to the chicken and egg problem inherent in trying to configure the primary network interfaces using a tool that needs a working network and ssh access to configure the target machines.
 
-The eventual aim is to have all of the system configuration automated as \ansible playbooks, enabling the \testplatform machines to be configured for other experiments and then wiped and re-configured back to the \testplatform settings automatically.
+The eventual aim is to have all of the system configuration automated as \ansible playbooks, enabling the \testplatform machines to be configured for other experiments and then wiped and re-configured back to the \testplatform settings.
 
-Combining this with the work done by Li Teng\footurl{https://github.com/wfau/feipengsy} using Kayobe\footurl{https://github.com/openstack/kayobe} to deploy \openstack on hardware at \roe 
-will mean we can reconfigure the \testplatform hardware to use different deployment platforms for different tests and experiments.
+Combining this with the work done by Li Teng\footurl{https://github.com/wfau/feipengsy} using Kayobe\footurl{https://github.com/openstack/kayobe} to deploy \openstack at \roe will mean we can reconfigure the \testplatform hardware to use different deployment platforms for different tests and experiments.
 
 \subsection{Virtual machine image}
 \label{deployment-vm-image}
@@ -553,9 +555,9 @@ In order to provide a reliable base for the virtual machines we have developed a
 
 The virtual machine image developed for the project is based on a minimal install of \redhat \fedora\footurl{https://getfedora.org/}\footurl{https://en.wikipedia.org/wiki/Fedora_(operating_system)} Linux distribution and the community edition of the \docker platform-as-a-service (\paas) tools\footurl{https://boxboat.com/2018/12/07/docker-ce-vs-docker-ee/}.
 
-The creation of the image is automated using a \kickstart\footurl{https://en.wikipedia.org/wiki/Kickstart_(Linux)}\footurl{https://pykickstart.readthedocs.io/en/latest/kickstart-docs.html} script which is available on \github as part of the \ischnura project\footurl{https://github.com/Zarquan/ischnura/blob/master/src/kickstart/fedora-docker-base.txt}. The kickstart script starts with the base install of the operating system, adds a basic set of system administration tools and then configures the default user account, \stevedore, with permission to install and configure new software and to create and manage \docker containers inside the virtual machine.
+The creation of the image is automated using a \kickstart\footurl{https://en.wikipedia.org/wiki/Kickstart_(Linux)}\footurl{https://pykickstart.readthedocs.io/en/latest/kickstart-docs.html} script which is available on \github as part of the \ischnura project\footurl{https://github.com/Zarquan/ischnura/blob/master/src/kickstart/fedora-docker-base.txt}. The kickstart script starts with the base install of the operating system, adds a basic set of system administration tools and then configures a default user account with permission to install and configure new software and to create and manage \docker containers inside the virtual machine.
 
-The default user account has password access disabled, and is configured to only allow ssh access using public key authentication\footurl{https://serverpilot.io/docs/how-to-use-ssh-public-key-authentication}. However, the image itself does not contain any ssh keys. It relies on the orchestration tools to inject the correct ssh key when a virtual machine instance is created using the image as a template.
+The default user account has password access disabled, and is configured to only allow ssh access using public key authentication\footurl{https://serverpilot.io/docs/how-to-use-ssh-public-key-authentication}. However, the image itself does not contain any ssh keys. It relies on the orchestration tools to inject the correct ssh key when a virtual machine instance is created.
 To enable this to happen, the virtual machine image is configured to use the \cloudinit tools to discover the configuration data for the instance and use it to configure the ssh keys for the user account.
 
 \subsection{\docker \btrfs storage driver}
@@ -570,7 +572,7 @@ Although the \btrfs \filesystem is still considered experimental by many system 
 
 One of the challenges the \lsstuk transient event processing will have to address is to \crossmatch the incoming event stream against archive databases of know objects. With this in mind we developed a series of experiments to compare the performance of different \crossmatch algorithms, database platforms and indexing to identify the best candidates for implementing a \crossmatch component capable of matching the live alert stream data rate from \lsst against the science catalogues held by \wfau.
 
-The objective for these experiments is to demonstrate a \crossmatch implementation capable of meeting the target of 1,000 alerts per second set in the Introduction to this paper, and be able to scale up to meet the higher stretch goals by adding additional resources.
+The objective for these experiments is to demonstrate a \crossmatch implementation capable of meeting the target of 1,000 alerts per second, and be able to scale up to meet the higher stretch goals by adding additional resources.
 
 The experiments compared two \crossmatch algorithms, the Hierarchical Triangular Mesh (HTM)
 algorithm currently used to index many of the \wfau catalogs compared with a zones based algorithm described in a 2004 Microsoft Research paper by J.Gray et al \cite{Gray-2004}.
@@ -607,8 +609,6 @@ The zone based algorithm uses a much simpler method of dividing the celestial sp
 
 The initial step of the zone based algorithm is much simpler to implement and faster to execute than the equivalent steps needed to locate the target triangle in the HTM algorithm, requiring only simple floating point and integer arithmetic operations compared to the complex trigonometry involved in the HTM algorithm.
 
-The trade off is to start the selection process using very simple steps, significantly reducing the amount of data involved, and then use more complex steps later in the process.
-
 \subsection{Database platform}
 \label{database-platform}
 
@@ -616,15 +616,58 @@ Due to the nature of the problem, performing a \crossmatch using a conventional 
 
 In order to maximize the performance, the experiments used an in-memory instance of the Hyper SQL Database (\hsqldb)\footurl{http://hsqldb.org/} database engine to evaluate the different algorithms. The reasoning behind this is that once the I/O data access bottle neck is removed from the equation, the differences between the indexing algorithms becomes much more significant.
 
+\subsection{Test framework}
+\label{test-framework}
+
+The initial set of tests established that we could get the  \crossmatch algorithms to work and early results suggested that there was a measurable difference in performance between them.
+However, the different \crossmatch algorithms were tested using different test frameworks which meant the test conditions were not the same.
+
+In order to address this we developed a test framework designed to compare the performance of the algorithms under the same conditions.
+
+The test framework was implemented as a set of Java \junit tests, using an abstract \javaname{Matcher} interface for the \crossmatch components.
+Each of the \crossmatch algorithms is wrapped as a component that implements the \javaname{Matcher} interface.
+
+\begin{lstlisting}[style=Java]
+    public interface Matcher
+        {
+        /**
+         * Insert a {@link Position} into the {@link Matcher}.
+         * 
+         */
+        public void insert(final Position position);
+
+        /**
+         * Match {@link Position}s within a radius around a target {@link Position}.
+         * 
+         */
+        public Iterator<Position> match(final Position target, final Double radius);
+
+        ....
+        }
+\end{lstlisting}
+
+The \javaname{Matcher} interface has two methods.
+An \javaname{insert(..)} method for inserting test data into the database and a \javaname{match(..)} method that performs a \crossmatch and returns a \javaname{List} of matching \javaplural{Position}.
+
+This interface design enables us to apply the same set of test conditions to each of the algorithms in turn, re-using the rest of the framework code each time.
+
+A test run consists of two stages, the first stage sets up the test parameters, the target point, the spread and density of test data around that point, the zone size and indexing method and then the second stage runs two nested loops.
+
+The outer loop generates and inserts a set of test data points into the database using the insert \javaname{insert(..)} method.
+
+The inner loop calls the \javaname{match(..)} method for a range of search radii, repeating the \crossmatch search a number of times for each radius to accumulate an average time for each \crossmatch search.
+
+The outer loop then adds another block of points to the database, doubling the size of the \dataset, and then calls the inner loop again to repeat the \crossmatch searches and collect another set of timings for the new \dataset.
+
 \subsection{Data generator}
 \label{test-data-generator}
 
-The aim of the experiments was to test the algorithms with large enough data sets to show up differences in the performance of the algorithms.
-A side effect of this was that loading and indexing the test data into the target systems took significantly more time than the actual test searches themselves.
-In order to mitigate this as much as possible, the data generator was designed to enable us to run a set of tests, add more data to the data set and then re-run the same tests again.
+The experiments needed to test the algorithms with a large enough \dataset to show up differences in the performance of the algorithms.
+As a result of the size of the test \dataset inserting and indexing the test took more time than the actual test searches themselves.
+In order to mitigate this as much as possible, the data generator was designed to enable us to run a set of tests, add more data to the \dataset and then re-run the same tests again.
 
-The data generator was designed to add data successively larger and larger sets of points in a square grid around an initial central target point, scaling up the number of points by a power of 2 each time.
-After each iteration the test data set will contain \(((2^n)+1)^2\) points.
+The data generator adds successively larger and larger sets of points in a square grid around an initial central target point, scaling up the number of points by a power of 2 each time.
+So after \textit{n} iterations the test data contains \(((2^n)+1)^2\) points.
 
 Given an initial point at the center. The first pass of the algorithm will add eight additional points to create a 3x3 grid of points around the target. 
 \begin{figure}[h]
@@ -647,17 +690,16 @@ The third pass will add a further fifty six points to create a 9x9 grid of 81 po
 \label{fig:data-count-03}
 \end{figure}
 
-The fourth pass adds another 208 points to create a 17x17 grid of 289 points around the target. 
-\begin{figure}[h]
+The fourth pass adds another 208 points to create a 17x17 grid of 289 points around the target. \begin{figure}[h]
 \includesvg{images/data-count-04.svg}
 \caption{$n=4 \ :\ ((2^n)+1)^2 = 17^2 = 289 \ points, 113 \ matches$}
 \label{fig:data-count-04}
 \end{figure}
 
-The new points added by each iteration are added in between the exiting points, keeping the maximum and minimum range the same. The result of adding more points increases the density of points around the target, which in turn increases the number of points within the search radius.
+The new points added by each iteration are added in between the exiting points, keeping the maximum and minimum range the same. The result of adding more points increases the density of points around the target, increasing the number of points within the search radius and hence the number of matches that should be returned by the search queries.
 
-The data generator only adds the new points needed to extend the data set to the new size, it will avoid duplicating the existing points.
-This becomes more significant as the size of the data set grows. By the time the algorithm reaches the \textit{12th} and \textit{13th} iterations, avoiding duplicating the existing sixteen million points when updating the data set from sixteen million to sixty seven million points saves a significant amount of time.
+The data generator only adds the new points needed to extend the \dataset to the new size, it will avoid duplicating the existing points.
+This becomes more significant as the size of the \dataset grows. By the time the algorithm reaches the \textit{12th} and \textit{13th} iterations, avoiding duplicating the existing sixteen million points when updating the \dataset from sixteen million to sixty seven million points saves a significant amount of time.
 
 \begin{equation*}
 \begin{split}
@@ -679,269 +721,22 @@ This becomes more significant as the size of the data set grows. By the time the
 \end{equation*}
 
 \subsection{Algorithm comparison}
-\label{database-algorithms}
+\label{algorithm-comparison}
 
-The tests were designed to run the different algorithms in the same test framework and compare their performance with different data set sizes, search radii and indexing.
+The initial set of tests established that we could get each of the algorithms to work, and early results suggested that there was a significant difference in performance between them, with the zone based algorithm out performing the HTM algorithm by a factor of 10. However, the algorithms were tested using different frameworks which meant the test conditions were not the same.
 
-The test framework is implemented as a set of Java \junit tests, using an abstract \javaname{Matcher} interface for the \crossmatch components.
-Each of the \crossmatch algorithms is implemented as a component that implements the \javaname{Matcher} interface.
+The second set of tests using the same framework also showed a difference between the algorithms but it was less than that suggested by the initial tests, and possibly less than we would have expected based on the results described by Jim Gray in 2004 \cite{Gray-2004} and Petar Zečević et al in 2019 \cite{Zecevic-2019}.
+The difference is still there, but it is not as strong as expected and can be very sensitive to the test conditions. In particular the zones algorithm is very sensitive to the ratio between the zone size and search radius.
 
-\begin{lstlisting}[style=Java]
-    public interface Matcher
-        {
-        /**
-         * Insert a {@link Position} into the {@link Matcher}.
-         * 
-         */
-        public void insert(final Position position);
+\textbf{TODO} - insert results table with new data
 
-        /**
-         * Match {@link Position}s within a radius around a target {@link Position}.
-         * 
-         */
-        public Iterator<Position> match(final Position target, final Double radius);
-
-        ....
-        }
-\end{lstlisting}
-
-The \javaname{Matcher} interface has two key methods.
-An \javaname{insert(..)} method for inserting test data into the database and a \javaname{match(..)} method that performs a \crossmatch and returns a \javaname{List} of matching \javaplural{Position}.
-
-This interface based design enables us to apply the same set of test conditions to each of the algorithms in turn, re-using the rest of the framework code each time.
-
-\clearpage
-
----- DELETE THIS ---
-
-The test framework around this is split into two sets of nested loops, the outer data generation loops and the inner \crossmatch selection loops.
-
-The \crossmatch tests are centred on a target position for each test run, configured using the \texttt{target.ra} and \texttt{target.dec} configuration properties.
-
-The outer most loop of the data generation loops uses the \texttt{range.min} and \texttt{range.max} configuration properties to control the range of data values in the test data.
-\begin{itemize}
-    \item \texttt{range.min} sets the lower limit for the range of values.
-    \item \texttt{range.max} sets the upper limit for the range of values.
-\end{itemize}
-
-These properties configure the upper and lower values of the range exponent, \textit{m}, which is used to set the exponent of the range in each iteration using the equation \(range = 2^m\).
-
-The data range loop counts down from the upper limit to the lower limit, decreasing the spread and increasing the density of the test data with each iteration.
-
-Given the following configuration:
-
-\begin{lstlisting}
-    range.min = 0
-    range.max = 6
-\end{lstlisting}
-
-The range loop will step from \textit{m = 6} to  \textit{m = 0}, generating data sets spread over a range of 
-\(2^6\) (64),
-\(2^5\) (32),
-\(2^4\) (16),
-\(2^3\) (8),
-\(2^2\) (4),
-\(2^1\) (2)
-and
-\(2^0\) (1).
-
-In each case the max and min range properties only controls the spread of the data not the number of values.
-If we assume the total count of values is fixed at 25 points, and a target position of \textit{ra=0,dec=0}, then a range exponent of \textit{m=8} would generate 25 data points spread over a range of $\pm64$ centered around the target point, producing values for \textit{ra} of [-64...+64] and \textit{dec} of [-64...+64].
-
-\begin{lstlisting}
-    -64,-64 
-    -64,-32 
-    -64,0 
-    -64,32
-    -64,64 
-
-    -32,-64 
-    -32,-32 
-    -32,0 
-    -32,32 
-    -32,64 
-
-    0,-64 
-    0,-32 
-    0,0 
-    0,32 
-    0,64 
-
-    32,-64 
-    32,-32 
-    32,0 
-    32,32 
-    32,64 
-
-    64,-64 
-    64,-32 
-    64,0 
-    64,32 
-    64,64 
-\end{lstlisting}
-
-If we keep the total count and target position the same, then a data range exponent of \textit{m=3} would still generate 25 points but this time spread over a range of $\pm8$ centered around the target point, producing values for \textit{ra} of [-8..+8] and \textit{dec} of [-8..+8].
-
-\begin{lstlisting}
-    -8,-8 
-    -8,-4 
-    -8,0 
-    -8,4 
-    -8,8 
-
-    -4,-8 
-    -4,-4 
-    -4,0 
-    -4,4 
-    -4,8 
-
-    0,-8 
-    0,-4 
-    0,0
-    0,4 
-    0,8 
-
-    4,-8 
-    4,-4 
-    4,0 
-    4,4 
-    4,8 
-
-    8,-8 
-    8,-4 
-    8,0 
-    8,4 
-    8,8 
-\end{lstlisting}
-
-At the lowest level, a data range exponent of \textit{m=0} still generates 25 points, this time spread over a range of $\pm1$ centered around the target point, producing values for \textit{ra} of [-1..+1] and \textit{dec} of [-1...+1].
-
-\begin{lstlisting}
-    -1.0,-1.0 
-    -1.0,-0.5 
-    -1.0,0.0 
-    -1.0,0.5
-    -1.0,1.0 
-
-    -0.5,-1.0 
-    -0.5,-0.5 
-    -0.5,0.0 
-    -0.5,0.5 
-    -0.5,1.0 
-
-    0.0,-1.0 
-    0.0,-0.5 
-    0.0,0.0
-    0.0,0.5 
-    0.0,1.0 
-
-    0.5,-1.0 
-    0.5,-0.5 
-    0.5,0.0 
-    0.5,0.5 
-    0.5,1.0 
-
-    1.0,-1.0 
-    1.0,-0.5 
-    1.0,0.0 
-    1.0,0.5 
-    1.0,1.0 
-\end{lstlisting}
-
-By setting \texttt{range.min} to 0 and \texttt{range.max} to 6 starts with a sparse data set with the points spread over $\pm64$ degrees and steps down to a very dense data set with all of the points concentrated within $\pm1$ degrees of the target position.
-
-Figure \ref{fig:data-range-01} shows the effect of keeping the number of points the same while reducing the range increases the density of the points putting more of them within the search radius, ending up with all of the points within the search radius.
-
-\begin{figure}[h]
-\includesvg{images/data-range-01.svg}
-\caption{The effect of reducing range on density of points}
-\label{fig:data-range-01}
-\end{figure}
-
-As the size of the test data set grows, creating and indexing the data takes up more time than the \crossmatch tests themselves.
-Each iteration of the outer loop uses the test data generator described in Section \ref{test-data-generator} to add another layer of points to the test data and then calls the inner loop to run a series of \crossmatch tests.
-Splitting the functionality onto an inner and outer loop enables us to apply the \crossmatch tests to a series of progressively larger data sets without having to re-build the whole data set each time. 
-
-
-The \texttt{insert.max} property sets the upper limit of the data size exponent, \textit{n}. The data generator loop starts with \textit{n=0}, each iteration increases the size of the data set to contain \(((2^n)+1)^2\) points, up to the final value of \textit{n} set by \texttt{insert.max}.
-
-In order to save time during development and make the testing more efficient, the \texttt{select.min} property enables us to skip the \crossmatch tests for low values of \textit{n}. The data generator loop starts with \textit{n=0}, but the \crossmatch selection tests are only applied for values of \textit{n} above the lower limit set by \texttt{select.min}.
-
-\noindent Given the following configuration:
-
-\begin{lstlisting}
-    select.min = 10
-    insert.max = 12
-\end{lstlisting}
-
-The outer loop will step through the first eight iterations of the loop, \textit{n=0} to \textit{n=9}, adding points to the data set but not applying the \crossmatch tests. The \crossmatch tests are only applied for iterations above limit set by \texttt{select.min}; iterations \textit{n=10} (1,050,625 points), \textit{n=11} (4,198,401 points) and \textit{n=12} (16,785,409 points).
-
-The inner loop performs the cross match searches and collects the timing statistics for comparison. 
-
-The configuration for the inner loop enables us to change the following properties of the cross match queries:
-
-\begin{itemize}
-    \item The search radius.
-    \item The number of times the search is repeated.
-\end{itemize}
-
----- DELETE THIS ---
-
-\clearpage
-
----- NEW SECTION ---
-
-Summary
-
-Testing was done in two phases.
-Initial set of tests established that we could get the algorithms to work.
-Initial tests showed a significant difference between algorithms.
-However the algorithms were implemented in separate code bases (Maven projects), so the test environment was not the same.
-Subsequent re-testing using the same code base and same test conditions showed less of a difference between the algorithms.
-Difference is still there, advantage to zones, but it is not as strong and depends on conditions.
-Zones is sensitive to zone size and search radius.
-
-Details
-
-Original results
-Retesting results
-Graphs
-
-
-
-
-
-
-
-
-
-
-The HTM tests used the Java library from JHU to calculate which triangles intersected the target region and then queried the database to find all the sources within those triangles.
-
-The zone based tests calculated which zones intersected the target region and then queried the database to find all the sources within those zones.
-
-The tests showed a significant advantage to the zone based algorithm, demonstrating a performance increase of a factor of 10 compared to the HTM algorithm.
-
-\begin{table}[h]
-\centering
-\begin{tabular}{|l|l|l|l|}
-\hline
-\textit{Algorithm} & \textit{Data size} & \textit{Matched} & \textit{Time}  \\ \hline
-HTM   & 4,000,000 rows & 10 rows & 213ms \\ \hline
-Zones & 4,000,000 rows & 11 rows & 17ms  \\ \hline
-\end{tabular}
-\end{table}
-
-It is important to note that development time for this project was limited,and we did not set out to perform an accurate or comprehensive performance benchmark of the two algorithms.
-The objective of these experiments was to check the findings in the paper by Gray et al; that the zone based algorithm was simpler to implement and performed significantly faster than the HTM algorithm.
-After the initial tests confirmed that this was the case we moved on to exploring optimizations to see how fast we could get the zone based algorithm to perform.
-As a result, the database queries and indexing used in the HTM version were not optimized.
-If an accurate benchmark is needed then it would be worth re-visiting the code and optimizing the HTM implementation to get the best performance from it.
+The test results contain a number of artifacts which make it harder to see a clear pattern in the results. The most likely cause of this is that as the test framework was optimised to concentrate on timing just the cross match algorithms themselves and the measurable time for a single cross match step dropped below 1 millisecond, then the background noise caused by processes like the Java garbage collector becomes much more significant.
+More work is needed to develop the test framework further to remove these artifacts and generate a clean set of results before they could be used as a definitive benchmark comparison.
 
 \subsection{Database indexing}
 \label{database-indexing}
 
-The next set of tests looked at the database query and indexing used in the zone based algorithm.
+One aspect of the tests looked at the database query and indexing used in the zone based algorithm.
 
 The SQL query used for the tests came from the query outlined in the paper by Gray, which included all three steps in the same query. The initial selection for the target Zone based on declination, the selection within the zone based on right ascension, and then a final selection based on distance.
 
@@ -994,13 +789,14 @@ Complex  [zone,ra,dec] & 2,563,201 & 38ms \\ \hline
 \end{tabular}
 \end{table}
 
+\textbf{TODO} - update results table with new data
+
 \subsection{CQEngine implementation}
 \label{cqengine-implementation}
 
-At this point we began to develop a native Java implementation of the zone algorithm using the \cqengine Collection Query Engine library to index data in Java Collections.
-%https://github.com/npgall/cqengine
+We also developed a native Java implementation of the zone algorithm, which compared the performance of the full relational database engine provided by \hsqldb with an implementation using the \cqengine Collection Query Engine\footurl{https://github.com/npgall/cqengine} library to index data in Java Collections.
 
-This version implemented the zone algorithm directly in Java code, using the \cqengine classes to implement an indexed collection of zones:
+The zone algorithm was implemented the directly in Java code using the \cqengine classes to implement an indexed collection of zones:
 
 \begin{lstlisting}[style=Java]
     public class ZoneMatcherImpl
@@ -1038,12 +834,14 @@ In-memory \cqengine & 2,563,201 & 3ms \\ \hline
 \end{tabular}
 \end{table}
 
+\textbf{TODO} - update results table with new data
+
 \subsection{Collection indexing}
 \label{cqengine-indexing}
 
 The next set of tests looked at different ways of indexing the data in the \cqengine Collections.
 
-The tests looked at three different indexing schemes for the inner \texttt{ConcurrentIndexedCollection} of positions. The first scheme simply created separate indexes on right ascension and declination.
+The tests looked at three different indexing schemes for the Collection of positions. The first scheme simply created separate indexes on right ascension and declination.
 
 \begin{lstlisting}[style=Java]
     positions.addIndex(
@@ -1102,6 +900,8 @@ Separate indexes & 12,587,009 & 0.45ms \\ \hline
 \end{tabular}
 \end{table}
 
+\textbf{TODO} - update results table with new data
+
 The results of the indexing tests match the way that the algorithm was implemented in the database version and the native Java version.
 
 The \hsqldb database implementation used a single SQL query to perform all three stages of the zone algorithm, selecting the zone, selecting positions within the zone based on \textit{ra} and \textit{dec} and then performing the final distance calculation all in one database query. It therefore makes sense that the combined and complex indexes performed better than the separate single value indexes for this case.
@@ -1128,36 +928,15 @@ The final set of tests looked at the relationship between the size of the zones,
 \end{tabular}
 \end{table}
 
+\textbf{TODO} - update results table with new data
+
 \subsection{Summary of results}
 \label{crossmatch-summary}
 
-Based on the test results, this set of experiments have been able to demonstrate a \crossmatch algorithm that is capable of meeting the target data rate of 1,000 alerts per second for catalog sizes of the order of 12 million sources. Further testing will be needed to demonstrate how this capability can be scaled to handle larger data sets.
+Based on the test results, this set of experiments have been able to demonstrate a \crossmatch algorithm that is capable of meeting the target data rate of 1,000 alerts per second for catalog sizes of the order of 67 million sources. 
+There is more that could be done to develop these experiments further, extending the size of the test \dataset, optimizing the indexing and exploring the relationship between zone size, search radius and search performance.
 
-There is more  that could be done to develop these experiments further, extending the size of the test data set, optimizing the indexing and exploring the relationship between zone size, search radius and search performance.
-
-There is also more work to do to explore ways to make the system scalable and fault tolerance.
-
-To meet the scalability and fault tolerance criteria we need to look at ways to distribute the \crossmatch searches over multiple machines.
-
-There are two aspects to the scalability question:
-\begin{itemize}
-    \item How to scale the processing rate.
-    \item How to scale the data size.
-\end{itemize}{}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+There is also more work to do to explore ways to make the system scalable and fault tolerance by distributing the \crossmatch searches over multiple machines.
 
 \section{Component libraries}
 \label{component-libraries}
@@ -1167,7 +946,7 @@ The following section describe in more detail some of the components that could 
 \subsection{Class interfaces}
 \label{component-libraries.java-interfaces}
 
-The following section describe some of the Java classes and interfaces developed as part of our work for \phasea of the \lsstuk project. 
+The following section describe some of the Java classes and interfaces developed as part of the prototype alert processing framework.
 
 \subsubsection{Processor}
 \label{java-interfaces.Processor}
@@ -1294,9 +1073,9 @@ Extend this a bit further, adding a list of \javaname{Processor} instances and a
 
 To implement a specific alert processor, the end user only has to provide one or more classes that implement the \texttt{Processor} to populate the list. A simple example of a \texttt{Processor} implementation would be a a solar system object filter.
 
-For alerts that correspond to known solar system objects the \ztf and \lsst alert messages will contain information about the corresponding solar system object.
+For alerts that correspond to known solar system objects the \ztf alert messages contain information about the corresponding solar system object.
 
-In the \ztf alert schema these include :
+In the \ztf alert \avschema these include :
 \begin{itemize}
   \item \texttt{ssnamenr} Name of nearest known solar system object if exists within 30 arcsec (from MPC archive).
   \item \texttt{ssdistnr} Distance to nearest known solar system object if exists within 30 arcsec [arcsec].
@@ -1455,11 +1234,9 @@ For example, the following \yaml fragment defines a processing component based o
 \end{lstlisting}
 
 The component designer creates this \yaml configuration file, or use a GUI design tool that creates \yaml configuration files like this, and submits it to the system.
-
 The framework behind would create the processing component wrapped up as a \docker container and pass it to the orchestration layer to run one or more instances of it in parallel.
 
-This is a deliberately simplified example, and there are many more details to work out, including user accounts, permissions and access controls to limit who is allowed to connect to which streams, who is allowed to create new streams, and what compute resources they are allowed to use etc.
-
+This is a deliberately simplified example, and there are many more details to add, including user accounts, permissions and access controls to limit who is allowed to connect to which streams, who is allowed to create new streams, and what compute resources they are allowed to use etc.
 However, this example is enough to demonstrate the ideas behind a basic framework which enables project developers, and potentially end users, to create alert processing pipelines from a toolkit of building blocks provided by the project.
 
 \subsubsection{Lasair ingestion}
@@ -1475,17 +1252,17 @@ Our example list of low speed processors could all be implemented as processing 
     \item Implemented as a \texttt{Processor} that serializes \texttt{Candidate} data to \avro files.
   \end{itemize}
 
-  \item Read alert messages and write candidates to \parquet files for downstream \spark analysis.
+  \item Read alert messages and write candidates to \parquet files analysis using \spark.
   \begin{itemize}
     \item Implemented as a \texttt{Processor} that serializes \texttt{Candidate} data to \parquet files.
   \end{itemize}
 
-  \item Read alert messages, extract the light curves and write them to \fits or \votable files for downstream analysis.
+  \item Read alert messages, extract the light curves and write them to \fits or \votable files.
   \begin{itemize}
     \item Implemented as a \texttt{Processor} that extracts light curve data from the \texttt{Candidate} and serializes it to a \fits file.
   \end{itemize}
 
-  \item Read alert messages, extract the images and write them to \fits, \png or \jpeg files for downstream display or analysis.
+  \item Read alert messages, extract the images and write them to \fits, \png or \jpeg files.
   
   \begin{itemize}
     \item Implemented as a \texttt{Processor} that extracts the images from the \texttt{Candidate} and serialises them to a variety of image formats.
@@ -1543,7 +1320,7 @@ By extending the \texttt{SolarSystemFilter} to add a switch that either includes
 \subsubsection{Crossmatch component}
 \label{workflow.cross-match}
 
-Section \ref{crossmatch-zones} describes some \crossmatch algorithms and indexing for matching alert Candidates against a catalog of positions.
+Section \ref{crossmatch-zones} describes two \crossmatch algorithms for matching alert Candidates against a catalog of positions.
 
 These \crossmatch algorithms can be used to build a \javaname{CatalogMatcher} component that matches each candidate against a catalog of positions, adding an annotation to the \javaname{Candidate} object with the result of each match.
 
@@ -1578,7 +1355,8 @@ We can extend the \javaname{Candidate} class, adding a list of \crossmatch match
 
 We can use this to build a component that combines a \javaname{CatalogMatcher} that matches the candidates against a catalog and a \javaname{KafkaProducer} that sends the results to a new \kftopic.
 
-[[diagram]]
+\textbf{TODO} - [[diagram]]
+
 \begin{itemize}
     \item A \javaname{CrossmatchComponent} that generates a \kfstream of \crossmatch annotated candidates :
     \begin{itemize}
@@ -1593,7 +1371,8 @@ In most cases it does not make sense to \crossmatch candidates that have already
 
 One way to achieve this would be to use separate \javaplural{Component} and connect them together using \kafka \kfstreams. Connecting the output from a \javaname{SolarSystemFilter} \javaname{Component} to the input of a \javaname{CrossmatchComponent}.
 
-[[diagram]]
+\textbf{TODO} - [[diagram]]
+
 \begin{itemize}
     \item A \javaname{Component} that generates a stream of candidates that are not associated with known solar system objects:
     \begin{itemize}
@@ -1616,7 +1395,8 @@ One way to achieve this would be to use separate \javaplural{Component} and conn
 
 Alternatively, we could combine the \javaname{SolarSystemFilter} and \javaname{CatalogMatcher} in the same \javaname{Component}.
 
-[[diagram]]
+\textbf{TODO} - [[diagram]]
+
 \begin{itemize}
     \item A \javaname{Component} that generates a \kfstream of \crossmatch annotated \texttt{Candidates} that are not associated with solar system objects:
     \begin{itemize}
@@ -1638,7 +1418,7 @@ The cost/benefit of combining \javaplural{Processor} within a complex \javaname{
 
 High cost processors like the \javaname{CrossmatchProcessor} are a better fit for deploying as separate \kftopics. Low cost processors like the \javaname{SolarSystemFilter} are better suited to being combined into compound \javaname{Components}.
 
-We expect that our use cases will need to use a combination of both methods for combining \javaplural{Component} and \javaplural{Processor}, complex \javaplural{Component} and \kftopics.
+We expect that the science use cases will require a combination of both methods for combining \javaplural{Component} and \javaplural{Processor}, complex \javaplural{Component} and \kftopics.
 
 \subsubsection{Kafka components}
 \label{workflow.kafka-components}
@@ -1673,15 +1453,14 @@ To help configure and manage this interconnected network we can treat the \kafka
           partitions  : 64
 \end{lstlisting}
 
-This simple \yaml configuration would deploy a new \kafka \kfbroker service, consisting of 4 servers running \kafa with the associated \zookeeper service and any monitoring and management services needed to administer them.
+This simple \yaml configuration would deploy a new \kafka \kfbroker service, consisting of 4 \kafka nodes along with the associated \zookeeper service and the monitoring and management services needed to administer them.
 
-[[diagram]]
+\textbf{TODO} - [[diagram]]
 
 Treating a \kafka \kfbroker as just another component makes it easy to deploy it alongside the processing components. A single \yaml configuration file could describe a chain of \kafka \kfbrokers and processing nodes that work together to implement everything needed for a science use case.
 
-Readers familiar with the \docker eco-system will recognise a similarity between these \yaml configuration files and \dockercompose configuration files used to deploy groups of \docker containers.
+Readers familiar with \docker and \kubernetes will recognise a similarity between these \yaml configuration files, \dockercompose configuration files and \kubernetes templates.
 Implementing the system behind this framework will probably use many of the infrastructure orchestration tools provided by \openstack, \docker and \kubernetes.
-
 However, where possible we should avoid exposing the implementation details of
 these lower level orchestration tools to either our science users or system administrators. The abstract component configuration outlined above is deliberately intended to separate the programming interface that the user interacts with from the orchestration technologies selected to implement the system.
 
@@ -1693,7 +1472,7 @@ Designing our own an abstraction layer has a number of advantages.
 Using our own components for the the user facing interface means we can evolve our implementation to adopt new technologies as they become available without causing migration problems for our users.
 
 2) It is unlikely that one technology will provide everything we will need to implement all of the functionality we want to have. As a result we will need to use a combination of different technologies, tools and frameworks to implement the system. Each of which will have their own programming interface and configuration file syntax.
-Using our own components for the the user facing API means our system can use a consistent programming interface and configuration syntax across all the different layers of the system.
+Using our own components for the the user facing API will provide a consistent programming interface and configuration syntax across all the different layers of the system.
 
 3) If we use the same orchestration tool for both the workflow management and the underlying system deployment, then we may run into access control issues.
 We don't want our end users to be able to access or modify the deployment of the underlying system services. Which means we would need to implement some form of access control that limits which parts of the system different users are allowed to access and to modify.
@@ -1706,32 +1485,21 @@ Ideally we would want a researcher to be able to experiment with developing thei
 \subsubsection{Updates}
 \label{workflow.updates}
 
-Original experiments were done in 2018, main text of the report in 2019. 
+The original experiments were done in 2018, and the main text of this report was written in 2019. 
 Updating this in 2020 we know a lot more about several of the deployment and orchestrations tools that are available.
-Specifically, Ansible, Terraform and Kubernetes.
-All of which will play a pivotal role in the development of the platform.
+We expect that \ansible, \terraform and \kubernetes will all play a pivotal role in the development of the platform.
 All three of them, to different extents, describe systems in a declarative way.
-Terraform and Kubernetes employ YAML documents that describe the required state of the system, and the tools figure out how to implement it.
-Knowing what we know now, strengthens the case for the ideas described in the preceding section.
-1) Using a declarative description of the desired workflow is a good way to enable users and administrators to construct the workflows they want.
-2) Containerised components will play a significant role.
-3) The \lsstuk project should develop their own YAML grammar for describing the workflows.
-4) The technology is evolving rapidly, and the project needs to be able to adapt as new tools and methods become available. Exposing a specific tools to end users e.g. Ansible would make it harder to move to an alternative e.g. Terraform.
+\terraform and \kubernetes in particular both employ YAML documents that describe the required state of the system and leave it up to the tools to figure out how to implement it.
 
-
-
-
-
-
-
+All the things we have learned since the original set of experiments were performed only strengthens the case for developing a declarative syntax for describing the system and an orchestration framework that builds the system by connecting together ready built components.
 
 \section{Kafka experiments}
 \label{kafka-compendium}
 
 The following sections report on lessons learned from our experience of working with \kafka during \phasea of the \lsstuk project.
 
-\subsection{Kafka introduction}
-\label{kafka-introduction}
+\subsection{Kafka broker}
+\label{kafka-broker}
 
 \kafka is a reliable message distribution service for sequential streams of data.
 
@@ -1742,35 +1510,34 @@ In this scenario, \kafka is the service in the middle, the \kfbroker that provid
 The \kafka \kfbroker does not know where the messages come from, or what happens to them after they are delivered.
 The \kafka \kfbroker concentrates purely on listening for messages from the \kfproducers, storing them in a buffer and forwarding them on to \kfconsumers.
 
-   [producers] -> [broker] -> [consumers]
+\textbf{TODO} - diagram
 
 \subsection{Publish-subscribe pattern}
 \label{kafka-pubsub-pattern}
 
 This separation between the delivery system and the message producing and consuming clients is referred to as the publish-subscribe or 'pub-sub' pattern \footurl{https://en.wikipedia.org/wiki/Publish-subscribe_pattern}.
 
-The publishing component of the publish-subscribe pattern is referred to as a \kfpublisher, or in \kafka terms, a \kfproducer.
-
-   [publisher] -> [broker]
+The publishing component of the publish-subscribe pattern is referred to as a \kfpublisher.
 
 In the publish-subscribe pattern, a \kfpublisher does not send the messages directly to their final destination. Instead the messages are tagged as belonging to a \kftopic and sent to the \kfbroker.
 Once a message has been sent to the \kfbroker the \kfproducer is no longer involved in the delivery.
+
+\textbf{TODO} - diagram
+
 The \kfpublisher does not need to know anything about the \kfsubscribers, how many there are, where they are or what they do with the messages.
 The \kfbroker is responsible for storing and forwarding the message to the correct destinations, leaving the \kfproducer free to work on producing the next message.
 
-The subscribing component of the publish-subscribe pattern is referred to as a \kfsubscriber, or in \kafka terms, a \kfconsumer.
+The subscribing component of the publish-subscribe pattern is referred to as a \kfsubscriber.
 
 A \kfsubscriber does not need to know anything about the \kfpublishers, it just receives messages from the \kfbroker. 
+The \kfsubscriber contacts the \kfbroker and asks to subscribe to a \kftopic. The \kfbroker will then pass on any messages it receives that have been tagged as belonging to that \kftopic.
 
-It is up to the \kfsubscriber to contact the \kfbroker and subscribe to a \kftopic. The \kfbroker will then pass on any messages it receives that have been tagged as belonging to that \kftopic.
+\textbf{TODO} - diagram
 
-   [broker] -> [subscriber]
+The choice of which messages belong to which \kftopics is not made by the \kfbroker. The assignment of messages to \kftopics is made by the \kfpublisher when it sends message to the \kfbroker.
+The \kfbroker does not read, interpret or filter the messages. It just passes messages on to \kfsubscribers based on which \kftopics the messages were tagged with. 
 
-The \kfbroker bridges the gap between \kfpublisher and \kfsubscriber, passing on messages based on the \kftopic they have been tagged with.
-
-    [publisher] -> [broker] -> [subscriber]
-
-The choice of which messages belong to which \kftopics is not made by the \kfbroker. The assignment of messages to \kftopics is made by the \kfpublisher  when the messages  are sent to the \kfbroker. The \kafa \kfbroker does not read, interpret or filter the messages. It just passes messages on to \kfsubscribers based on which \kftopics the messages have been tagged with. 
+\textbf{TODO} - diagram
 
 \subsection{Producers and consumers}
 \label{kafka-producer-consumer}
@@ -1811,35 +1578,35 @@ However using one does not require the use of the other.
 \subsection{Avro schema}
 \label{avro-schema}
 
-Using \avro to encode the message content requires the \kfpublisher and \kfsubscriber to share information about the message schema to enable the recipient to decode the binary bytes back into usable message content.
+Using \avro to encode the message content requires the \kfpublisher and \kfsubscriber to share information about the message \avschema to enable the recipient to decode the binary bytes back into usable message content.
 
-However the \kfbroker itself does not provide any support for sharing metadata about the message schema. \kafka is not directly linked to \avro and the \kfbroker cannot see inside the messages. It is up to us, the system developers, to figure out how to share metadata about the message schema with the \kfproducers and \kfconsumers. 
+However the \kfbroker itself does not provide any support for sharing metadata about the message \avschema. \kafka is not directly linked to \avro and the \kfbroker cannot see inside the messages. It is up to us, the system developers, to figure out how to share metadata about the message \avschema with the \kfproducers and \kfconsumers. 
 
-There are three main patterns used to share information about the message schema between \kfproducer and \kfconsumer.
+There are three main patterns used to share information about the message \avschema between \kfproducer and \kfconsumer.
 
 \subsubsection{Static shared schema}
 \label{avro-static-schema}
 
-The simplest method is to fix the message schema beforehand, giving both \kfproducer and \kfconsumer a static copy of the schema.  In this method the  messages are transmitted as-is, as binary arrays, without any additional metadata about the schema.
+The simplest method is to fix the message \avschema beforehand, giving both \kfproducer and \kfconsumer a static copy of the \avschema.  In this method the  messages are transmitted as-is, as binary arrays, without any additional metadata about the \avschema.
 
-This works for simple test systems, but it is inherently fragile and will break the first time that we add a new  \kfproducer that uses a slightly different schema.
+This works for simple test systems, but it is inherently fragile and will break the first time that we add a new  \kfproducer that uses a slightly different \avschema.
 
-There is enough built-in error checking in the \avro serialization encoding for a client to be able to validate a message against a message schema. However the validation process costs a significant amount of compute resources, and in the end all it can give you is a simple yes/no test to indicate whether the message matches the expected schema. It can't tell you anything more about what the message contains.
+There is enough built-in error checking in the \avro serialization encoding for a client to be able to validate a message against a message \avschema. However the validation process costs a significant amount of compute resources, and in the end all it can give you is a simple yes/no test to indicate whether the message matches the expected \avschema. It can't tell you anything more about what the message contains.
 
-In reality most systems that use a shared static schema rely on an external process to ensure the \kfproducer and \kfconsumer use the correct schema. Again, this works for simple test systems, but it is inherently fragile and does not scale to handle lots of different types of messages.
+In reality most systems that use a shared static \avschema rely on an external process to ensure the \kfproducer and \kfconsumer use the correct \avschema. Again, this works for simple test systems, but it is inherently fragile and does not scale to handle lots of different types of messages.
 
 \subsubsection{In-line schema}
 \label{avro-inline-schema}
 
-The in-line method embeds the schema into the header for each message.
-Every message includes a full copy of the message schema, serialized as a plain text \json\footurl{https://www.json.org/} document.
+The in-line method embeds the \avschema into the header for each message.
+Every message includes a full copy of the message \avschema, serialized as a plain text \json\footurl{https://www.json.org/} document.
 
     [[diagram]]
 
-This means that all the messages are self-describing. A client does not need to know about the message schema beforehand, it can use the embedded schema to \deserz a message into a generic structure on the fly.
+This means that all the messages are self-describing. A client does not need to know about the message \avschema beforehand, it can use the embedded \avschema to \deserz a message into a generic structure on the fly.
 
-However, embedding the schema in every message adds a non-trivial overhead, particularly if the \kfstream only contains a small number of well known message types.
-In the current ZTF \kfstream, every message carries with it a copy of all four schema files:
+However, embedding the \avschema in every message adds a non-trivial overhead, particularly if the \kfstream only contains a small number of well known message types.
+In the current ZTF \kfstream, every message carries with it a copy of all four \avschema files:
 
 \begin{itemize}
   \item alert.avsc (1094 bytes)
@@ -1850,27 +1617,27 @@ In the current ZTF \kfstream, every message carries with it a copy of all four s
 
 This adds an overhead of 22,679 bytes to every message. Scale that up to the 10kHz data rate expected from LSST and this represents a continuous load of over 220 Mbytes per second to re-transmit information the client already knows.
 
-Sending the schema with the message means the message is self describing, but it also means that the client is encountering the structure for the first time every time it receives a message. If the client is \deserzing messages on the fly using the schema from the message header, then the the client is unable to apply any form of optimisation to the decoding process. It has to \deserz the message into a generic object structure that is inefficient to construct and inefficient to use.
+Sending the \avschema with the message means the message is self describing, but it also means that the client is encountering the structure for the first time every time it receives a message. If the client is \deserzing messages on the fly using the \avschema from the message header, then the the client is unable to apply any form of optimisation to the decoding process. It has to \deserz the message into a generic object structure that is inefficient to construct and inefficient to use.
 
-The current ZTF message handling uses a combination of both the static schema and inline schema methods.
-The upstream ZTF \kfproducer is sending a full copy of the schema in the header of every message, but not all of the clients are making use of this. 
-Some of the clients ignore the schema in the header and use a \deserzer built from a static copy of the schema embedded in the client source code, leaving them vulnerable to changes to the message schema from the upstream \kfproducer.
+The current ZTF message handling uses a combination of both the static \avschema and inline \avschema methods.
+The upstream ZTF \kfproducer is sending a full copy of the \avschema in the header of every message, but not all of the clients are making use of this. 
+Some of the clients ignore the \avschema in the header and use a \deserzer built from a static copy of the \avschema embedded in the client source code, leaving them vulnerable to changes to the message \avschema from the upstream \kfproducer.
 
 \subsubsection{Schema registry}
 \label{avro-schema-registry}
 
-The third option is to use an external registry to associate the message schema with a simple identifier based on a fingerprint hash of the schema content. This identifier is sent in the message header, replacing the full schema with a simple numeric value.
+The third option is to use an external registry to associate the message \avschema with a simple identifier based on a fingerprint hash of the \avschema content. This identifier is sent in the message header, replacing the full \avschema with a simple numeric value.
 
 The client software contains a set of compiled \deserzers for known message structures.
-These \deserzers are built from static copies of the schema and can be optimised to generate fully qualified object classes that directly represent the message structure.
+These \deserzers are built from static copies of the \avschema and can be optimised to generate fully qualified object classes that directly represent the message structure.
 
-If the upstream \kfproducer produces a message based on one of these known message types, then the client will recognise the schema identifier and use it to load the corresponding \deserzer to \deserz the message into an object.
+If the upstream \kfproducer produces a message based on one of these known message types, then the client will recognise the \avschema identifier and use it to load the corresponding \deserzer to \deserz the message into an object.
 
-If the upstream message \kfproducer introduces a new type of message, one that is not in the client's library of schema, then the client can detect this and has the option to take action to fix the problem.
+If the upstream message \kfproducer introduces a new type of message, one that is not in the client's library of \avschema, then the client can detect this and has the option to take action to fix the problem.
 
-\confluent have defined a wire format\footurl{https://docs.confluent.io/current/schema-registry/serdes-develop/index.html#wire-format} for embedding schema identifiers at the beginning of a message.
+\confluent have defined a wire format\footurl{https://docs.confluent.io/current/schema-registry/serdes-develop/index.html#wire-format} for embedding \avschema identifiers at the beginning of a message.
 
-The format starts with a single byte to represent the serialization format version (zero in the current version) followed by four bytes for the schema identifier and then the rest of the message body.
+The format starts with a single byte to represent the serialization format version (zero in the current version) followed by four bytes for the \avschema identifier and then the rest of the message body.
 
 \begin{table}[h]
 \begin{tabulary}{\linewidth}{|L|L|L|}
@@ -1879,50 +1646,50 @@ The format starts with a single byte to represent the serialization format versi
 \hline
 0 & Magic Byte & Confluent serialization format version number; currently always 0. \\
 \hline
-1-4 & Schema ID & Four byte schema ID from the \schemaregistry. \\
+1-4 & Schema ID & Four byte schema ID from the \conschemaregistry. \\
 \hline
-5+ & Data & Serialized data for the specified schema format (e.g. binary encoding for Avro or Protocol Buffers). \\
+5+ & Data & Serialized data for the specified \avschema format (e.g. binary encoding for Avro or Protocol Buffers). \\
 \hline
 \end{tabulary}
 \end{table}
 
-\confluent also have defined a REST \webservice interface for a \schemaregistry \footurl{https://www.confluent.io/confluent-schema-registry/}
-that provides a platform for \kfproducers and \kfconsumers to register and resolve information about message schema.
+\confluent also have defined a REST \webservice interface for a \conschemaregistry \footurl{https://www.confluent.io/confluent-schema-registry/}
+that provides a platform for \kfproducers and \kfconsumers to register and resolve information about message \avschema.
 
-A \kfproducer can upload their message schema to the REST service to register it and get a unique numeric identifier in return. This identifier can be sent in the message header.
+A \kfproducer can upload their message \avschema to the REST service to register it and get a unique numeric identifier in return. This identifier can be sent in the message header.
 
-If a \kfconsumer is configured to use the same registry service, then the first time it encounters a message with a schema identifier it does not recognise it can call the \schemaregistry service to resolve the schema identifier and download a copy of the schema.
+If a \kfconsumer is configured to use the same registry service, then the first time it encounters a message with a \avschema identifier it does not recognise it can call the \conschemaregistry service to resolve the \avschema identifier and download a copy of the \avschema.
 
-The \kfconsumer can use this downloaded schema to create a generic \deserzer that can \deserz with the message structure.
+The \kfconsumer can use this downloaded \avschema to create a generic \deserzer that can \deserz with the message structure.
 
-In effect this is an indirect version of the in-line schema pattern. Using the \schemaregistry to transfer a copy of the message schema from the \kfproducer to the \kfconsumer. However, this only has to be done once, when the \kfconsumer first encounters a message with this schema identifier. For subsequent messages with the same schema identifier, the \kfconsumer can use the local cached copy of the schema and corresponding \deserzer.
+In effect this is an indirect version of the in-line \avschema pattern. Using the \conschemaregistry to transfer a copy of the message \avschema from the \kfproducer to the \kfconsumer. However, this only has to be done once, when the \kfconsumer first encounters a message with this \avschema identifier. For subsequent messages with the same \avschema identifier, the \kfconsumer can use the local cached copy of the \avschema and corresponding \deserzer.
 
-This reduces the transmission overhead from 22,000 extra bytes to 5 bytes per message, 1 for the schema version and 4 bytes for the schema identifier. It also means the \kfconsumer does not have to construct a new \deserzer every time, it can re-use a cached \deserzer linked to the schema identifier.
+This reduces the transmission overhead from 22,000 extra bytes to 5 bytes per message, 1 for the \avschema version and 4 bytes for the \avschema identifier. It also means the \kfconsumer does not have to construct a new \deserzer every time, it can re-use a cached \deserzer linked to the \avschema identifier.
 
 This scheme works well to create flexible \kfconsumers that can handle any message structure and is used extensively by the \confluent tools and services like the \confluent Connect \footurl{https://docs.confluent.io/current/connect/index.html} components and the the \confluent Platform \footurl{https://www.confluent.io/product/confluent-platform} components.
 
-The \schemaregistry service is designed to manage the schema for an entire organisation, including support for deploying a distributed registry service that functions across more than one data center.
-However, this pattern does not work for managing schema across multiple organisations.
+The \conschemaregistry service is designed to manage the \avschema for an entire organisation, including support for deploying a distributed registry service that functions across more than one data center.
+However, this pattern does not work for managing \avschema across multiple organisations.
 
-The first problem is that the schema identifier is just a single 32bit integer, assigned by the central registry service for the organisation. This identifier is guaranteed to be be unique within the host organisation, but as far as we know there is no way of extending this to span multiple organisations.
+The first problem is that the \avschema identifier is just a single 32bit integer, assigned by the central registry service for the organisation. This identifier is guaranteed to be be unique within the host organisation, but as far as we know there is no way of extending this to span multiple organisations.
 The second problem is that the message header only contains the 32bit numeric identifier, it does not contain any information about which registry service to use to resolve this identifier.
-The pattern relies on the \kfproducers and \kfconsumers within an organisation all being configured with the endpoint address for the \schemaregistry service, which does not scale to register and resolve schema across separate organisations.
+The pattern relies on the \kfproducers and \kfconsumers within an organisation all being configured with the endpoint address for the \conschemaregistry service, which does not scale to register and resolve \avschema across separate organisations.
 
-For example, within a single organisation all of the \kfproducers and \kfconsumers are configured to use a single central \schemaregistry by setting the endpoint URL \texttt{http://registry.example.org/}.
-When a \kfproducer starts to send messages it first checks the registry to see if the schema it is going to use has been registered. If the schema has not been registered the \kfproducer uploads a \json encoded copy of the schema and receives a new unique identifier for the schema, e.g. 27.
+For example, within a single organisation all of the \kfproducers and \kfconsumers are configured to use a single central \conschemaregistry by setting the endpoint URL \texttt{http://registry.example.org/}.
+When a \kfproducer starts to send messages it first checks the registry to see if the \avschema it is going to use has been registered. If the \avschema has not been registered the \kfproducer uploads a \json encoded copy of the \avschema and receives a new unique identifier for the \avschema, e.g. 27.
 
-The first time a \kfconsumer receives a message with this schema identifier in the message header it can use the \schemaregistry to resolve this identifier into a \json encoded copy of the schema and use that to generate a \deserzer to handle the new  message structure.
-This works because both the \kfproducer and \kfconsumer have been configured to use the same \schemaregistry endpoint address to register and resolve schema.
+The first time a \kfconsumer receives a message with this \avschema identifier in the message header it can use the \conschemaregistry to resolve this identifier into a \json encoded copy of the \avschema and use that to generate a \deserzer to handle the new  message structure.
+This works because both the \kfproducer and \kfconsumer have been configured to use the same \conschemaregistry endpoint address to register and resolve \avschema.
 
-However if the \kfproducer and \kfconsumer are in different organisations, then when the \kfconsumer receives a message with schema identifier 27 in the header it has no way of discovering which \schemaregistry it should use to resolve the identifier to get a copy of the original schema.
+However if the \kfproducer and \kfconsumer are in different organisations, then when the \kfconsumer receives a message with \avschema identifier 27 in the header it has no way of discovering which \conschemaregistry it should use to resolve the identifier to get a copy of the original \avschema.
 
-The \confluent system does support deploying a distributed \schemaregistry across multiple physical data centers\footurl{https://docs.confluent.io/current/schema-registry/multidc.html}, by configuring one \schemaregistry as the primary registry and the other registries as secondary or slave registries.
-The secondary or slave registries must pass all new schema back to the primary registry for registration, centralising the  generation of identifiers and ensuring they remain unique within the organisation.
+The \confluent system does support deploying a distributed \conschemaregistry across multiple physical data centers\footurl{https://docs.confluent.io/current/schema-registry/multidc.html}, by configuring one \conschemaregistry as the primary registry and the other registries as secondary or slave registries.
+The secondary or slave registries must pass all new \avschema back to the primary registry for registration, centralising the  generation of identifiers and ensuring they remain unique within the organisation.
 
-Passing new schema back to the primary registry for registration means that while this model may work for multiple (\textasciitilde 10) data centers within an organization, it is unlikely to scale to include a multi-level hierarchy of (\textasciitilde 100) different organizations within the astronomy domain.
-If all of the secondary registries are required to register their schema with the top level primary registry, then the \lsst project would become the de facto central \schemaregistry for the entire astronomy domain, which is a responsibility are unlikely to want to take on. 
+Passing new \avschema back to the primary registry for registration means that while this model may work for multiple (\textasciitilde 10) data centers within an organization, it is unlikely to scale to include a multi-level hierarchy of (\textasciitilde 100) different organizations within the astronomy domain.
+If all of the secondary registries are required to register their \avschema with the top level primary registry, then the \lsst project would become the de facto central \conschemaregistry for the entire astronomy domain, which is a responsibility are unlikely to want to take on. 
 
-At the time of writing, the \lsst project had not decided on what methods they would eventually adopt for managing version control for their message schema. However a number of their design documents refer to the \confluent \schemaregistry as a possible solution.
+At the time of writing, the \lsst project had not decided on what methods they would eventually adopt for managing version control for their message \avschema. However a number of their design documents refer to the \confluent \conschemaregistry as a possible solution.
 
 \begin{quote}
 \textit{“The LSST Project will make available a registry of all alert schemas ever used operationally by LSST. Schemas may be retrieved from this registry by some convenient interface given a four-byte schema ID. Conceptually, this is equivalent to the Confluent Schema Registry, although it is possible an alternative implementation will be deployed in practice."} \footurl{https://dmtn-093.lsst.io/#management-and-evolution}
@@ -1935,21 +1702,21 @@ At the time of writing, the \lsst project had not decided on what methods they w
 \subsubsection{Gateway broker}
 \label{avro-schema-gateway}
 
-If the \lsst project do adopt the \confluent \schemaregistry to register their alert schema, then the \lsstuk project will need to develop a similar mechanism for managing version control of message schema within the \lsstuk project.
+If the \lsst project do adopt the \confluent \conschemaregistry to register their alert \avschema, then the \lsstuk project will need to develop a similar mechanism for managing version control of message \avschema within the \lsstuk project.
 
-The following proposal outlines the design for a gateway \kfbroker that would handle the mapping between schema identifiers from the upstream \lsst \schemaregistry and schema identifiers in the local \lsstuk \schemaregistry.
+The following proposal outlines the design for a gateway \kfbroker that would handle the mapping between \avschema identifiers from the upstream \lsst \conschemaregistry and \avschema identifiers in the local \lsstuk \conschemaregistry.
 
-The first part of the solution is to deploy a local instance of the \confluent \schemaregistry which would be responsible for managing all the schema versions within the \lsstuk organization.
+The first part of the solution is to deploy a local instance of the \confluent \conschemaregistry which would be responsible for managing all the \avschema versions within the \lsstuk organization.
 
-We would then need to create a mapping between schema identifiers in messages from from the upstream \lsst \kfbroker and the corresponding schema identifiers in our own \schemaregistry.
+We would then need to create a mapping between \avschema identifiers in messages from from the upstream \lsst \kfbroker and the corresponding \avschema identifiers in our own \conschemaregistry.
 
 This could be handled by deploying a modified form of the mirror maker service already in use as part of the \stageone buffer.
-This gateway service would maintain a mapping between schema identifiers from the upstream \lsst \kfbroker and those in the local \lsstuk \schemaregistry and translate the schema identifiers on the fly as it imported messages from the upstream \lsst \kfbroker into the \lsstuk system.
+This gateway service would maintain a mapping between \avschema identifiers from the upstream \lsst \kfbroker and those in the local \lsstuk \conschemaregistry and translate the \avschema identifiers on the fly as it imported messages from the upstream \lsst \kfbroker into the \lsstuk system.
 
-The gateway service would read the four byte schema identifier from each message and check for a corresponding schema in the local \schemaregistry. If it did not find a matching schema then it would call the upstream \schemaregistry to resolve the schema identifier, download a \json encoded copy of the schema and then register the new schema in the local \schemaregistry. This would generate a new identifier, valid for the local domain.
-The gateway \kfbroker can then replace the four byte schema identifier in each message from the upstream \kfbroker with the corresponding local identifier from the local \schemaregistry before it passes the message on to the \lsstuk \kfbroker system.
+The gateway service would read the four byte \avschema identifier from each message and check for a corresponding \avschema in the local \conschemaregistry. If it did not find a matching \avschema then it would call the upstream \conschemaregistry to resolve the \avschema identifier, download a \json encoded copy of the \avschema and then register the new \avschema in the local \conschemaregistry. This would generate a new identifier, valid for the local domain.
+The gateway \kfbroker can then replace the four byte \avschema identifier in each message from the upstream \kfbroker with the corresponding local identifier from the local \conschemaregistry before it passes the message on to the \lsstuk \kfbroker system.
 
-Using a gateway \kfbroker like this enables the \lsstuk project to maintain a local \schemaregistry to provide version control for all of the message schema used within the \lsstuk system. This would include copies of schema published by the upstream \kfbroker and the internal schema generated by dynamic database queries and filtering components within the \lsstuk system.
+Using a gateway \kfbroker like this enables the \lsstuk project to maintain a local \conschemaregistry to provide version control for all of the message \avschema used within the \lsstuk system. This would include copies of \avschema published by the upstream \kfbroker and the internal \avschema generated by dynamic database queries and filtering components within the \lsstuk system.
 
 
 
