@@ -48,6 +48,7 @@
 \newcommand{\dnsmasq} {\texttt{dnsmasq}\xspace}
 \newcommand{\dns} {DNS\xspace}
 \newcommand{\dhcp} {DCHP\xspace}
+\newcommand{\cephfs} {CephFS\xspace}
 
 \newcommand{\ischnura} {Ischnura\xspace}
 \newcommand{\esperia} {Esperia\xspace}
@@ -93,6 +94,9 @@
 \newcommand{\kfsubscriber} {\textit{subscriber}\xspace}
 \newcommand{\kfsubscribers} {\textit{subscribers}\xspace}
 
+\newcommand{\kfpartition} {\textit{partition}\xspace}
+\newcommand{\kfpartitions} {\textit{partitions}\xspace}
+
 \newcommand{\apache} {Apache\xspace}
 \newcommand{\confluent} {Confluent\xspace}
 
@@ -114,6 +118,7 @@
 \newcommand{\avschema} {\textit{schema}\xspace}
 \newcommand{\avschemas} {\textit{schema}\xspace}
 \newcommand{\conschemareg} {registry\xspace}
+\newcommand{\conschemaregs} {registries\xspace}
 \newcommand{\conschemaregistry} {Schema Registry\xspace}
 \newcommand{\mirrormaker} {Mirror Maker\xspace}
 
@@ -321,8 +326,8 @@ If a component in our system fails, the buffer gives us time to fix the issue, t
 
 \subsubsection{Partition count}
 \label{stage-1.partition-count}
-The number of partitions in a \kafka stream puts an upper limit on the level of parallelism that downstream components can apply to processing a stream (see section \ref{kafka-partitions}).
-Deploying a buffer at the input to our system give us direct control over the number of partitions available to the rest of our processing components.
+The number of \kfpartitions in a \kafka stream puts an upper limit on the level of parallelism that downstream components can apply to processing a stream (see section \ref{kafka-partitions}).
+Deploying a buffer at the input to our system give us direct control over the number of \kfpartitions available to the rest of our processing components.
 
 \subsubsection{Schema mapping}
 \label{stage-1.schema-mapping}
@@ -1545,42 +1550,41 @@ The \kfbroker does not read, interpret or filter the messages. It just passes me
 In \kafka terminology the \kfpublisher component of the publish-subscribe pattern is called a \kfproducer, and a \kfsubscriber component is called a \kfconsumer.
 
 At the implementation level, a \kfpublisher uses a connector class from the \kafka client library to send messages to a \kafka broker.
-The connector class in the client library also called a \javaname{Producer}. So in terms of what is in the source code, a message \kfpublisher sends its messages by calling the \javaname{write()} method on a \javaname{Producer} object.
+The connector class in the client library also called a \javaname{Producer}.
+In terms of what is in the program source code, a message \kfpublisher sends its messages by calling the \javaname{write()} method on a \javaname{Producer} object.
 This quirk of naming can cause some confusion when talking about \kfproducers and \kfconsumers.
-It is important to keep in mind that the class in the client library is not a \kfproducer, it does not produce messages, it is just a connector. The whole message generating component is the \kfproducer, which makes use of a connector from the \kafka client library to send messages to a \kfbroker.
+It is important to keep in mind that the class in the client library is not a \kfproducer, it does not produce messages, it is just a connector. The whole message generating component is the \kfproducer, which uses an instance of a connector \javaname{class} from the \kafka client library to send messages to the \kfbroker.
 
-   {P(p)} -> [broker]
-
+\textbf{TODO} - diagram
 
 Similarly on the receiving side, a \kfsubscriber, or \kafka \kfconsumer, uses a connector class from the \kafka client library to receive messages from a \kafka broker.
-The class in the client library that reads messages from a broker is called a \javaname{Consumer}. So in terms of what is in the source code, the message \kfsubscriber receives messages by calling the \javaname{read()} method on a \javaname{Consumer} object.
-Again it is important to keep in mind that the class in the client library is not a \kfconsumer, it is just a connector. The whole message handling component is the \kfconsumer, making use of a connector class from the \kafka client library to receive messages from a \kfbroker.
+The class in the client library that reads messages from a broker is also called a \javaname{Consumer}. In terms of what is in the program source code, a message \kfsubscriber receives messages by calling the \javaname{read()} method on a \javaname{Consumer} object.
+Again it is important to keep in mind that the class in the client library is not a \kfconsumer, it is just a connector. The whole message handling component is the \kfconsumer, which uses an instance of a connector \javaname{class} from the \kafka client library to receive messages from a \kfbroker.
 
-   [broker] -> {(c)C}
-
-\subsection{Message encoding}
-\label{kafka-encoding}
-
-As far as the \kafka \kfbroker is concerned, the content of the messages is opaque. The \kafka \kfbroker does not look at the content of messages, it just delivers them.
-The \kfbroker handles messages as simple arrays of bytes, regardless of their content.
+\textbf{TODO} - diagram
 
 \subsection{Avro encoding}
 \label{avro-encoding}
 
-It is fairly common pattern to use the 
-\avro serialization format to encode messages handled by \kafka.
+As far as the \kafka \kfbroker is concerned, the content of the messages is opaque. The \kafka \kfbroker does not look at the content of messages, it just delivers them.
+The \kfbroker handles messages as simple arrays of bytes, regardless of their content.
+
+It is fairly common pattern to use the  \avro serialization format to encode messages handled by \kafka.
 There are strong links between the \kafka and \avro development 
 communities and developers from \confluent contribute to the development of both projects.
 However using one does not require the use of the other.
-\avro is a binary serialization encoding that is used by many different applications.
-\kafka is a publish-subscribe message broker that handles messages in any format, irrespective of how the message content is encoded.
+
+\begin{itemize}
+    \item \avro is a binary serialization encoding that is used by many different applications.
+    \item \kafka is a publish-subscribe message broker that handles messages in any format, irrespective of how the message content is encoded.
+\end{itemize}
 
 \subsection{Avro schema}
 \label{avro-schema}
 
 Using \avro to encode the message content requires the \kfpublisher and \kfsubscriber to share information about the message \avschema to enable the recipient to decode the binary bytes back into usable message content.
 
-However the \kfbroker itself does not provide any support for sharing metadata about the message \avschema. \kafka is not directly linked to \avro and the \kfbroker cannot see inside the messages. It is up to us, the system developers, to figure out how to share metadata about the message \avschema with the \kfproducers and \kfconsumers. 
+However the \kfbroker itself does not provide any support for sharing metadata about the message \avschema. \kafka is not directly linked to \avro and the \kfbroker cannot see inside the messages. It is up to the system developers, to figure out how to share metadata about the message \avschema between \kfproducers and \kfconsumers. 
 
 There are three main patterns used to share information about the message \avschema between \kfproducer and \kfconsumer.
 
@@ -1591,9 +1595,9 @@ The simplest method is to fix the message \avschema beforehand, giving both \kfp
 
 This works for simple test systems, but it is inherently fragile and will break the first time that we add a new  \kfproducer that uses a slightly different \avschema.
 
-There is enough built-in error checking in the \avro serialization encoding for a client to be able to validate a message against a message \avschema. However the validation process costs a significant amount of compute resources, and in the end all it can give you is a simple yes/no test to indicate whether the message matches the expected \avschema. It can't tell you anything more about what the message contains.
+There is enough built-in error checking in the \avro serialization encoding for a client to be able to validate a message against a message \avschema. However, the validation process costs a non-trivial amount of compute resources, and in the end all it can produce is a simple PASS/FAIL result to indicate whether the message matches the expected \avschema.
 
-In reality most systems that use a shared static \avschema rely on an external process to ensure the \kfproducer and \kfconsumer use the correct \avschema. Again, this works for simple test systems, but it is inherently fragile and does not scale to handle lots of different types of messages.
+Most implementations that use a shared static \avschema rely on an external, out of band, process to ensure the \kfproducer and \kfconsumer use the correct \avschema. Again, this works for simple test systems, but it is inherently fragile and does not scale to handle multiple different types of messages.
 
 \subsubsection{In-line schema}
 \label{avro-inline-schema}
@@ -1601,7 +1605,7 @@ In reality most systems that use a shared static \avschema rely on an external p
 The in-line method embeds the \avschema into the header for each message.
 Every message includes a full copy of the message \avschema, serialized as a plain text \json\footurl{https://www.json.org/} document.
 
-    [[diagram]]
+\textbf{TODO} - diagram
 
 This means that all the messages are self-describing. A client does not need to know about the message \avschema beforehand, it can use the embedded \avschema to \deserz a message into a generic structure on the fly.
 
@@ -1615,27 +1619,30 @@ In the current ZTF \kfstream, every message carries with it a copy of all four \
   \item prv candidate.avsc (6565 bytes)
 \end{itemize}
 
-This adds an overhead of 22,679 bytes to every message. Scale that up to the 10kHz data rate expected from LSST and this represents a continuous load of over 220 Mbytes per second to re-transmit information the client already knows.
+This adds an overhead of 22,679 bytes to every message. Scale that up to the 10kHz data rate expected from LSST and this represents a continuous load of over 220 Mbytes per second to continuously re-transmit the same \avschema information to all of the \kfconsumers.
 
-Sending the \avschema with the message means the message is self describing, but it also means that the client is encountering the structure for the first time every time it receives a message. If the client is \deserzing messages on the fly using the \avschema from the message header, then the the client is unable to apply any form of optimisation to the decoding process. It has to \deserz the message into a generic object structure that is inefficient to construct and inefficient to use.
+Sending the \avschema with the message means the message is self describing, but it also means that the client is encountering the structure for the first time every time it receives a message. If the client is \deserzing messages on the fly using the \avschema from the message header, then the the client is unable to apply any form of optimisation to the decoding process. It has to \deserz the message into a generic object structure each time, which can be inefficient to construct and inefficient to use.
 
 The current ZTF message handling uses a combination of both the static \avschema and inline \avschema methods.
 The upstream ZTF \kfproducer is sending a full copy of the \avschema in the header of every message, but not all of the clients are making use of this. 
 Some of the clients ignore the \avschema in the header and use a \deserzer built from a static copy of the \avschema embedded in the client source code, leaving them vulnerable to changes to the message \avschema from the upstream \kfproducer.
 
+This represents the bad parts of both options. The overhead of transmitting a full copy of the \avschema with every message, and fragile \kfsubscribers using static copies of the \avschema.
+
 \subsubsection{Schema registry}
 \label{avro-schema-registry}
 
-The third option is to use an external registry to associate the message \avschema with a simple identifier based on a fingerprint hash of the \avschema content. This identifier is sent in the message header, replacing the full \avschema with a simple numeric value.
+The third option is to use a \conschemareg pattern developed by \confluent which uses a \conschemaregistry to link the message \avschema with a numeric identifier based on a hash of the \avschema content.
+This identifier is sent in the message header, replacing the full \avschema with a simple numeric value.
 
 The client software contains a set of compiled \deserzers for known message structures.
 These \deserzers are built from static copies of the \avschema and can be optimised to generate fully qualified object classes that directly represent the message structure.
 
 If the upstream \kfproducer produces a message based on one of these known message types, then the client will recognise the \avschema identifier and use it to load the corresponding \deserzer to \deserz the message into an object.
 
-If the upstream message \kfproducer introduces a new type of message, one that is not in the client's library of \avschema, then the client can detect this and has the option to take action to fix the problem.
+If the upstream message \kfproducer introduces a new type of message, one that is not in the client's library of \avschema, then the client can use the \avschema identifier to resolve the \avschema in the \conschemareg and download a copy of the registered \avschema. 
 
-\confluent have defined a wire format\footurl{https://docs.confluent.io/current/schema-registry/serdes-develop/index.html#wire-format} for embedding \avschema identifiers at the beginning of a message.
+\confluent have defined a wire protocol  format\footurl{https://docs.confluent.io/current/schema-registry/serdes-develop/index.html#wire-format} for embedding \avschema identifiers at the beginning of a message.
 
 The format starts with a single byte to represent the serialization format version (zero in the current version) followed by four bytes for the \avschema identifier and then the rest of the message body.
 
@@ -1654,49 +1661,45 @@ The format starts with a single byte to represent the serialization format versi
 \end{table}
 
 \confluent also have defined a REST \webservice interface for a \conschemaregistry \footurl{https://www.confluent.io/confluent-schema-registry/}
-that provides a platform for \kfproducers and \kfconsumers to register and resolve information about message \avschema.
+that provides a standard service API for \kfproducers and \kfconsumers to register and resolve information about message \avschema.
 
 A \kfproducer can upload their message \avschema to the REST service to register it and get a unique numeric identifier in return. This identifier can be sent in the message header.
 
-If a \kfconsumer is configured to use the same registry service, then the first time it encounters a message with a \avschema identifier it does not recognise it can call the \conschemaregistry service to resolve the \avschema identifier and download a copy of the \avschema.
+The first time a \kfconsumer encounters a message with a \avschema identifier it does not recognise it can call the \conschemaregistry service to resolve the \avschema identifier and download a copy of the \avschema.
 
-The \kfconsumer can use this downloaded \avschema to create a generic \deserzer that can \deserz with the message structure.
+The \kfconsumer can use this downloaded \avschema to create a \deserzer that can \deserz with the message structure.
 
 In effect this is an indirect version of the in-line \avschema pattern. Using the \conschemaregistry to transfer a copy of the message \avschema from the \kfproducer to the \kfconsumer. However, this only has to be done once, when the \kfconsumer first encounters a message with this \avschema identifier. For subsequent messages with the same \avschema identifier, the \kfconsumer can use the local cached copy of the \avschema and corresponding \deserzer.
 
 This reduces the transmission overhead from 22,000 extra bytes to 5 bytes per message, 1 for the \avschema version and 4 bytes for the \avschema identifier. It also means the \kfconsumer does not have to construct a new \deserzer every time, it can re-use a cached \deserzer linked to the \avschema identifier.
 
-This scheme works well to create flexible \kfconsumers that can handle any message structure and is used extensively by the \confluent tools and services like the \confluent Connect \footurl{https://docs.confluent.io/current/connect/index.html} components and the the \confluent Platform \footurl{https://www.confluent.io/product/confluent-platform} components.
+This scheme works well to create flexible \kfconsumers that can handle multiple message structures and is used extensively by the \confluent tools and services such as the \confluent Connect \footurl{https://docs.confluent.io/current/connect/index.html} components and \confluent Platform \footurl{https://www.confluent.io/product/confluent-platform} frameworks.
 
 The \conschemaregistry service is designed to manage the \avschema for an entire organisation, including support for deploying a distributed registry service that functions across more than one data center.
 However, this pattern does not work for managing \avschema across multiple organisations.
 
-The first problem is that the \avschema identifier is just a single 32bit integer, assigned by the central registry service for the organisation. This identifier is guaranteed to be be unique within the host organisation, but as far as we know there is no way of extending this to span multiple organisations.
-The second problem is that the message header only contains the 32bit numeric identifier, it does not contain any information about which registry service to use to resolve this identifier.
-The pattern relies on the \kfproducers and \kfconsumers within an organisation all being configured with the endpoint address for the \conschemaregistry service, which does not scale to register and resolve \avschema across separate organisations.
+The first problem is that the \avschema identifier is just a single 32 bit integer, assigned by the central registry service for the organisation. This identifier is guaranteed to be be unique within the host organisation, but as far as we know there is no way of extending this to span multiple organisations.
 
-For example, within a single organisation all of the \kfproducers and \kfconsumers are configured to use a single central \conschemaregistry by setting the endpoint URL \texttt{http://registry.example.org/}.
-When a \kfproducer starts to send messages it first checks the registry to see if the \avschema it is going to use has been registered. If the \avschema has not been registered the \kfproducer uploads a \json encoded copy of the \avschema and receives a new unique identifier for the \avschema, e.g. 27.
+The second problem is that the message header only contains the 32 bit numeric identifier, it does not contain any information about \textit{which} \conschemareg service to use to resolve the identifier.
+The \conschemaregistry pattern relies on all the \kfproducers and \kfconsumers within an organisation configured with the same endpoint address for the one central \conschemaregistry service; which does not scale to register and resolve \avschema across separate organisations.
 
-The first time a \kfconsumer receives a message with this \avschema identifier in the message header it can use the \conschemaregistry to resolve this identifier into a \json encoded copy of the \avschema and use that to generate a \deserzer to handle the new  message structure.
-This works because both the \kfproducer and \kfconsumer have been configured to use the same \conschemaregistry endpoint address to register and resolve \avschema.
+If the \kfproducers and \kfconsumers are in different organisations, and using different \conschemaregistry services, then a \kfconsumer has no way of discovering which \conschemareg it should use to resolve the numeric identifier into the corresponding \avschema.
 
-However if the \kfproducer and \kfconsumer are in different organisations, then when the \kfconsumer receives a message with \avschema identifier 27 in the header it has no way of discovering which \conschemaregistry it should use to resolve the identifier to get a copy of the original \avschema.
+The \confluent system does support deploying a distributed \conschemaregistry across multiple physical data centers\footurl{https://docs.confluent.io/current/schema-registry/multidc.html}, by configuring one \conschemareg as the primary and all the other \conschemaregs as secondaries.
 
-The \confluent system does support deploying a distributed \conschemaregistry across multiple physical data centers\footurl{https://docs.confluent.io/current/schema-registry/multidc.html}, by configuring one \conschemaregistry as the primary registry and the other registries as secondary or slave registries.
-The secondary or slave registries must pass all new \avschema back to the primary registry for registration, centralising the  generation of identifiers and ensuring they remain unique within the organisation.
+The secondary \conschemaregs are not able to register new \avschema themselves, they must pass all new \avschema back to the primary \conschemareg for registration, centralising the  generation of identifiers and ensuring they remain unique within the organisation.
 
-Passing new \avschema back to the primary registry for registration means that while this model may work for multiple (\textasciitilde 10) data centers within an organization, it is unlikely to scale to include a multi-level hierarchy of (\textasciitilde 100) different organizations within the astronomy domain.
-If all of the secondary registries are required to register their \avschema with the top level primary registry, then the \lsst project would become the de facto central \conschemaregistry for the entire astronomy domain, which is a responsibility are unlikely to want to take on. 
+Passing new \avschema back to the primary \conschemareg for registration means that while this model may work for \textasciitilde 10 data centers within an organization, it is unlikely to scale to include a multi-level hierarchy of \textasciitilde 100 different organizations within the astronomy domain.
+If all of the secondary registries are required to register their \avschema with the top level primary registry, then the \lsst project would become the de facto central \conschemaregistry for the entire astronomy domain. 
 
 At the time of writing, the \lsst project had not decided on what methods they would eventually adopt for managing version control for their message \avschema. However a number of their design documents refer to the \confluent \conschemaregistry as a possible solution.
 
 \begin{quote}
-\textit{“The LSST Project will make available a registry of all alert schemas ever used operationally by LSST. Schemas may be retrieved from this registry by some convenient interface given a four-byte schema ID. Conceptually, this is equivalent to the Confluent Schema Registry, although it is possible an alternative implementation will be deployed in practice."} \footurl{https://dmtn-093.lsst.io/#management-and-evolution}
+\textit{“The LSST Project will make available a registry of all alert schemas ever used operationally by LSST. Schemas may be retrieved from this registry by some convenient interface given a four-byte schema ID. Conceptually, this is equivalent to the Confluent Schema Registry, although it is possible an alternative implementation will be deployed in practice."}\footurl{https://dmtn-093.lsst.io/#management-and-evolution}
 \end{quote}
 
 \begin{quote}
-\textit{“... we have not committed on a particular mechanism for distributing the alert format and making changes to it. One option is the Confluent Schema Registry [1]; choosing this option may have implications on the deserialization performance of consumers.”} \footurl{https://dmtn-149.lsst.io/#alert-format}
+\textit{“... we have not committed on a particular mechanism for distributing the alert format and making changes to it. One option is the Confluent Schema Registry [1]; choosing this option may have implications on the deserialization performance of consumers.”}\footurl{https://dmtn-149.lsst.io/#alert-format}
 \end{quote}
 
 \subsubsection{Gateway broker}
@@ -1713,78 +1716,50 @@ We would then need to create a mapping between \avschema identifiers in messages
 This could be handled by deploying a modified form of the mirror maker service already in use as part of the \stageone buffer.
 This gateway service would maintain a mapping between \avschema identifiers from the upstream \lsst \kfbroker and those in the local \lsstuk \conschemaregistry and translate the \avschema identifiers on the fly as it imported messages from the upstream \lsst \kfbroker into the \lsstuk system.
 
-The gateway service would read the four byte \avschema identifier from each message and check for a corresponding \avschema in the local \conschemaregistry. If it did not find a matching \avschema then it would call the upstream \conschemaregistry to resolve the \avschema identifier, download a \json encoded copy of the \avschema and then register the new \avschema in the local \conschemaregistry. This would generate a new identifier, valid for the local domain.
+The gateway service would read the four byte \avschema identifier from each message and check for a corresponding \avschema in the local \conschemaregistry. If it did not find a matching \avschema then it would call the upstream \conschemaregistry provided by \lsst to resolve the \avschema identifier, download a \json encoded copy of the \avschema and then register the new \avschema in the local \conschemaregistry. This would generate a new identifier, valid for the local domain.
 The gateway \kfbroker can then replace the four byte \avschema identifier in each message from the upstream \kfbroker with the corresponding local identifier from the local \conschemaregistry before it passes the message on to the \lsstuk \kfbroker system.
 
-Using a gateway \kfbroker like this enables the \lsstuk project to maintain a local \conschemaregistry to provide version control for all of the message \avschema used within the \lsstuk system. This would include copies of \avschema published by the upstream \kfbroker and the internal \avschema generated by dynamic database queries and filtering components within the \lsstuk system.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Using a gateway \kfbroker like this enables the \lsstuk project to maintain a local \conschemaregistry to provide version control for all of the message \avschema used within the \lsstuk system. This would include copies of \avschema published by the upstream \kfbroker and any internal \avschema generated by dynamic database queries and filtering components within the \lsstuk system.
 
 \subsection{Kafka replication}
 \label{kafka-data-storage}
 
-A \kafka server stores data for a topic as a set of log files which are split into partitions and distributed across the servers in a cluster.
+A \kafka server stores data for a topic as a set of log files which are split into \kfpartitions and distributed across the servers in a cluster.
 
-The number of partitions is set by the client when the topic is created and the \javaname{Producer} class from the client library is responsible for distributing the data across the partitions.
+The number of \kfpartitions is set by the client when the topic is created and the \javaname{Producer} class from the client library is responsible for distributing the data across the \kfpartitions.
 
 \begin{figure}[H]
 \begin{center}
 \includegraphics{images/kafka-partitions-01.png}
 %\includesvg{images/kafka-partitions-01.svg}
-\caption{Client \javaname{Producer} distributes messages to partitions}
+\caption{Client \javaname{Producer} distributes messages to \kfpartitions}
 \label{fig:kafka-partitions-01}
 \end{center}
 \end{figure}
 
 \clearpage
-The total number of log files is set by the number of partitions multiplied by the replication factor set for that topic.
-If a topic has four partitions, and a replication factor of three, then the data will be spread across twelve log files.
+The total number of log files is set by the number of \kfpartitions multiplied by the replication factor set for that topic.
+If a topic has four \kfpartitions, and a replication factor of three, then the data will be spread across twelve log files.
 If this topic is served by four servers, then each server will be allocated three of the twelve files.
 
-The \javaname{Producer} client connector writes each partition to one server. Replicating the data to the other servers in the cluster is handled internally by server to server transfers.
+The \javaname{Producer} client connector writes each \kfpartition to one server. Replicating the data to the other servers in the cluster is handled internally by server to server transfers.
 
 \begin{figure}[H]
 \begin{center}
 \includegraphics{images/kafka-partitions-03.png}
 %\includesvg{images/kafka-partitions-03.svg}
-\caption{Client \javaname{Producer} distributes messages to partitions}
+\caption{Client \javaname{Producer} distributes messages to \kfpartitions}
 \label{fig:kafka-partitions-01}
 \end{center}
 \end{figure}
 
 \clearpage
-I we loose one of the machines, server-s2 for example, the system still has two copies of each of the three partition files that were on server-s2.
+If we loose one of the machines, server-s2 for example, the system still has two copies of each of the three \kfpartition files that were on server-s2.
 
 \begin{itemize}
-    \item partition-p1 is on server-s1 and server-s3
-    \item partition-p2 is on server-s1 and server-s4
-    \item partition-p4 is on server-s3 and server-s4
+    \item \kfpartition-p1 is on server-s1 and server-s3
+    \item \kfpartition-p2 is on server-s1 and server-s4
+    \item \kfpartition-p4 is on server-s3 and server-s4
 \end{itemize}
 
 If we replace server-2 with an empty machine, the three missing log files can be recovered using data from the other servers.
@@ -1798,23 +1773,81 @@ If we replace server-2 with an empty machine, the three missing log files can be
 \end{center}
 \end{figure}
 
+Our experience of using \kafka on an unreliable cloud platform that is having issues with virtual machines loosing contact and dropping off the network is that the \kafka replication system works well and enables system administrators to provide a reliable and fault tolerant \kfbroker service even when the underlying platform is not reliable.
+
+However, we did encounter a couple of issues that system administrators should be aware of.
+
+\subsubsection{Storage replication}
+\label{storage-replication}
+
+If the \kafka system is deployed on an \openstack cloud platform, then a fairly common way to manage storage space for the \kafka nodes is to use the Cinder\footurl{https://docs.openstack.org/cinder/latest/} block storage service to provide virtual discs on each node.
+
+A fairly common way of implementing the Cinder block storage service for an \openstack deployment is to use a \cephfs\footurl{https://docs.ceph.com/docs/master/cephfs/} 
+service to aggregate storage space across the network to provide a distributed file system for Cinder to use.\footurl{https://docs.openstack.org/cinder/pike/configuration/block-storage/drivers/ceph-rbd-volume-driver.html}
+
+A \cephfs service may itself use data replication to improve the reliability of the distributed file system.
+As a result, the combination of default configurations may mean that the data is replicated twice. Once by \kafka itself and again by the underlying \cephfs service used by \openstack.
+
+This is not always a problem, and in fact using RAID replication for the \cephfs distributed file system can improve the performance of the system.
+
+In theory it is possible for \openstack users to control the level of replication that is used for Cinder volumes. However, exposing the volume type configuration options to end users is not necessarily available on all \openstack deployments.
+
+System administrators need to be aware that this is happening and take steps to make sure it is configured correctly. 
+
+Replicating the data multiple times can can have cost implications for a large scale deployment, possibly doubling or tripling the cost of storage space.
+
+\subsubsection{Storage validation}
+\label{storage-validation}
+
+\kafka is designed to prioritise the integrity and reliability of the cluster.
+As part of this, on startup, each \kafka node will validate all of the data in it's local directories before it becomes active and joins the cluster.
+
+In most situations, this works well, and ensures that a \kafka node with corrupted data does not join an active cluster and replicate the corrupted data to other nodes.
+
+However, if a \kafka node is storing a lot of historical data or is configured with a high level of replication, then this data validation process can become counter productive.
+
+As part of our experiments with \kafka we configured a broker to maintain a full history of the \kftopics transmitted from \ztf by setting the retention period and space quotas to zero, preventing the broker from deleting any of the data it received.
+As a result the system gradually accumulates more and more data over time, building a permanent archive of all the daily \kftopics published by \ztf.
+
+This works well while the system is up and running, but may cause problems when the system is shutdown and restarted.
+
+On restart, \textit{all} of the nodes will first validate \textit{all} of the data in their local directories before they attempt to register as members of the cluster.
+This may take a significant amount of time, from several minutes to several hours, depending on the amount of data they have accumulated and how it is stored.
+
+Under normal conditions, while the \kafka \kfbroker is up and running, the nodes only need to access a small quantity of data from disc at any one time. 
+Most of the time the \kfbroker nodes will be sequentially writing new blocks to the leading edge of each \kfpartition as new messages arrive and they will try to reduce the amount of random reads from disc by maintaining a buffer of recent data in memory.
+
+On restart, each node has to do a full scan of all the data in their local directories to validate all the replicas of all the \kfpartitions stored on that node.
+
+To make matters worse, on a clean startup of the system, all the nodes are attempting to do this all at the same time. This will place a high load on any resources shared between the nodes.
+If the nodes are configured to use a network mounted file system, such as Cinder volumes on an \openstack deployment, then the network infrastructure needs to be able to cope with a sustained high load while all of the nodes validate their data.
+If several nodes are configured to share space on the same physical disc then the sustained load of multiple concurrent random reads make have a significant impact on performance.
+
+In a worst case example, one of our experiments had four \kafka nodes sharing space on the same set of physical hard discs. The \kafka broker was configured to keep a full record of all the messages and had been accumulating data for around six months.
+When this service was restarted, the cumulative effect of all four nodes trying to scan all their data at the same time meant the data validation process took more than 20 hours to complete.
+During which time, the \kafka \kfbroker had no active nodes in the cluster and was unable to process any new messages.
+
+In this case, this service was deliberately configured this way to learn what would happen.
+The \kafka user guide explicitly advises system administrators not to share disc spindles between \kafka nodes for this reason.
+
+Based on our experience with administering a \kafka \kfbroker it is worth experimenting with different \textit{what if} scenarios like this to learn how \kafka behaves when things go wrong and how to manage them when they do.
+
 \clearpage
 
 \subsection{Kafka partitions}
 \label{kafka-partitions}
 
-The partitioning and replication of data is essential to the way that Kafka operates, and provides much of the performance and reliability benefits of Kafka.
-However, the same partitioning and duplication can also cause a number of
-side effects that we need to be aware of.
+The partitioning and replication of data is essential to the way that Kafka operates, and provides much of it's performance and reliability benefits.
+However, the choice of how \kftopics are partitioned is not necessarily as simple as first expected and system administrators need to be aware of how it can effect system performance for the \kfbroker itself and for downstream data processing components.
 
-One of the issues that needs to be considered is the number of partitions for a topic. If we consider an example configuration of a \kfproducer connected to a set of four servers.
+The key issue that needs to be considered is the number of \kfpartitions for each topic. If we consider an example configuration of a \kfproducer connected to a set of four servers.
 
-If the topic only has three partitions, the \kfproducer will distribute the data to each of the three partitions in turn.
+If the \kftopic is configured to have only three \kfpartitions, the \kfproducer will distribute the data to each of the three \kfpartitions in turn.
 
-If we simplify the distribution process to a round-robin selection, then the first block of messages will be sent to partition one on the first server, the second block is sent to partition two on the second server, and the third block is sent to partition three on the third server.
+If we simplify the distribution process to a round-robin selection, then the first block of messages will be sent to \kfpartition 1 on the first node, the second block is sent to \kfpartition 2 on the second node, and the third block is sent to \kfpartition 3 on the third node.
 
-The fourth block is not sent the fourth server because we only have three partitions.
-The fourth block is sent to partition one on the first server, the fifth to partition two on the second server and the sixth block to partition three on the the third server.
+The fourth block of messages are not sent the fourth node because the \kftopic is configured to have only three \kfpartitions.
+Instead the fourth block is sent to \kfpartition 1 on the first node, the fifth to \kfpartition 2 on the second node and the sixth block to \kfpartition 3 on the the third node.
 
 \begin{figure}[H]
 \begin{center}
@@ -1825,12 +1858,15 @@ The fourth block is sent to partition one on the first server, the fifth to part
 \end{center}
 \end{figure}
 
-In this simple configuration, with more servers than partitions, the fourth server does not have any partitions allocated to it.
-In reality, the replication factor would normally be greater than one, so internal replication would spread copies of the data between the four servers, including the fourth service.
-However, to simplify this example we are only tracking the primary copies for each partition and not the replicas.
+\textbf{TODO} - update the diagram to show \kfpartitions and nodes
 
-If we increase the partition count to four, then the partitions are spread
-evenly across all four servers.
+In this configuration, with more nodes than \kfpartitions, the fourth node does not have any \kfpartitions allocated to it.
+In reality, the replication factor would normally be greater than one, so internal replication would spread copies of the data between the four nodes, and so the fourth node would get a share of the data.
+However, to simplify this example we are only tracking the primary copies for each \kfpartition and not the replicas.
+
+If we increase the \kfpartition count to four, then the \kfpartitions are spread evenly across all four nodes.
+
+If the \kfproducer sends six blocks of data, they are spread as evenly as possible between the four \kfpartitions; \kfpartitions 1 and 2 will get two data blocks each and \kfpartitions 3 and 4 will get just one data block.
 
 \begin{figure}[H]
 \begin{center}
@@ -1841,9 +1877,11 @@ evenly across all four servers.
 \end{center}
 \end{figure}
 
-With five partitions, then three of the four servers would have one partition each, and one of the servers would have two partitions.
+\textbf{TODO} - update the diagram to show \kfpartitions and nodes
 
-With six partitions, then two of the have two partitions and two of the servers have one partition.
+With five \kfpartitions, then three of the four nodes would have one \kfpartition each, and one of the nodes would have two \kfpartitions.
+
+With six \kfpartitions, then two of the have two \kfpartitions and two of the servers have one \kfpartition.
 
 \begin{figure}[H]
 \begin{center}
@@ -1854,88 +1892,75 @@ With six partitions, then two of the have two partitions and two of the servers 
 \end{center}
 \end{figure}
 
+As the number of \kfpartitions increases, the data is spread more evenly across the servers.
 
+With twenty five \kfpartitions, three of the four servers would have six
+\kfpartitions, and one of the servers would have seven \kfpartitions.
 
+With one hundred and twenty five \kfpartitions, three of the four servers would have thirty one \kfpartitions, and one of the servers would have thirty two \kfpartitions.
 
+The general rule is configuring a topic to have more \kfpartitions spreads the data more evenly across the available resources.
 
-As the number of partitions increases, the data is spread more evenly across the servers.
+The same process of distributing data between resources applies to \kfconsumers receiving data from the \kfbroker.
 
-With twenty five partitions, three of the four servers would have six
-partitions, and one of the servers would have seven partitions.
+Starting with our first example, three \kfpartitions spread across four nodes. If we have a single consumer, then data from all four \kfpartitions are sent to the same consumer.
 
-With one hundred and twenty five partitions, three of the four servers would have thirty one
-partitions, and one of the servers would have thirty two partitions.
+\textbf{TODO} - diagram
 
+If we add a second consumer, then the three \kfpartitions are spread as evenly as possible between the two \kfconsumers. In this case, one \kfconsumer would receive data for two of the \kfpartitions and one \kfconsumer would receive data for the remaining \kfpartition.
+Note that \kafka will not share data from a \kfpartition between \kfconsumers, so it will not allocate one and a half \kfpartitions of data to each of the two \kfconsumers.
 
-With data being written into our service, we can now look at how the data is sent to downstream consumers.
+If we have three consumers, then each consumer handles data from one \kfpartition.
 
-Starting with the first example, three partitions spread across four servers.
-If we have a single consumer, then data from all four partitions are sent to the same consumer.
+If we have four consumers, then three of the consumers each get data from a \kfpartition, and the fourth consumer does not receive any data.
 
-If we have two consumers, the first consumer would be sent data for one partition, and the second consumer would be sent data for two partitions.
+\textbf{TODO} - diagram
 
-If we have three consumers, then each consumer handles data from one partion.
-
-If we have four consumers, then three of the consumers each handle data one partition, and the fourth consumer does not receive any data.
-
-Increasing the number of consumers beyond the number of partitions
+Increasing the number of consumers beyond the number of \kfpartitions
 results in idle consumers with no data sent to them.
 
-This limits the level of concurrency that the downstream component can be configured with. With three partitions, then the system will only send data to three consumers.
+This limits the level of concurrency that the downstream component can be configured with. With three \kfpartitions, then the system will only send data to three consumers.
 Adding more consumers running in parallel will not increase the data throughput.
 
-With twenty five partitions, we can add up to twenty five consumers running in parallel,
-and each consumer will receive data from one partition.
+With twenty five \kfpartitions, we can add up to twenty five consumers running in parallel, and each consumer will receive data from one \kfpartition.
 
-With one hundred and twenty five partitions, we can add up to hundred and twenty five
-consumers running in parallel.
+With one hundred and twenty five \kfpartitions, we can add up to hundred and twenty five consumers running in parallel.
 
-The general rule is configuring a topic to have more partitions spreads the data more
-evenly accross the available resources.
+Allocating \kfpartitions to resources is a dynamic process. If we add more nodes to a live cluster, the cluster will automatically re-assign \kfpartitions to the new nodes, balancing the \kfpartitions and replicas between the available resources.
 
-This is a dynamic process. If we add more servers to a live cluster, the servers in the cluster
-will automatically assign partions to the new joiners, balancing the partitions
-and replication between the available resources.
+Adding new nodes to a cluster will not increase the number of \kfpartitions for a \kftopic, it will just spread the existing \kfpartitions across the available nodes.
 
-Likewise adding more consumers to a consumer group, the servers will automatically assign
-partions to the new joiners, balancing the partitions between the consumers.
+Likewise adding more \kfconsumers to a consumer group will automatically assign \kfpartitions to the new joiners, balancing the \kftopic \kfpartitions between the \kfconsumers.
 
-If we have twenty five partitions and ten consumers, then five of the consumers will be sent
-data from three partitions, and five of the consumers will be sent data from two partitions.
+If we have twenty five \kfpartitions and ten \kfconsumers, then five of the \kfconsumers will receive data for three of the \kfpartitions, and five of the \kfconsumers will receive data for two of the \kfpartitions.
 
-As we add more consumers to the group the servers will dynamically re-allocate
-partitions between the consumers.
+\textbf{TODO} - diagram
 
-With eleven consumers, eight consumers will get data from two partitions and
-three will get data from three partitions.
+As we add more \kfconsumers to the group the \kfbroker will dynamically re-allocate \kfpartitions between the \kfconsumers.
+This works all the way up to twenty five \kfconsumers, each handling data from one \kfpartition.
 
-This works all the way up to twenty five consumers, each handling data from one partition.
+Adding a twenty sixth \kfconsumers will not spread the data from a \kfpartition between two \kfconsumers. So the twenty sixth \kfconsumers will not get any data.
 
-Adding a twenty sixth consumer will not spread the data from a partion between two
-consumers. So the twenty sixth consumer will not get any data.
+The general rule is splitting a \kftopic across more \kfpartitions in the \kfbroker means it can be spread across more \kfconsumers downstream.
+The number of \kfpartitions a \kftopic is assigned in the \kfbroker sets the upper limit on the number of concurrent \kfconsumers downstream.
+Having more \kfconsumers than \kfpartitions will result in the extra \kfconsumers sitting idle with no data sent to them.
 
-The general rule is splitting the data across more partitions in the service means it can be spread
-across more concurrent consumers downstream.
-The number of partitions in the service sets the upper limit on the number of concurrent
-consumers downstream.
-Having more consumers than partitions will result in consumers sitting idle with no data being sent to them.
+Note that the number of \kfconsumers in these examples equates to the number of concurrent threads. In terms of partitioning a \kftopic, a single \kfconsumer process with four threads is the same as
+four \kfconsumer running one thread each.
 
-Note that the number of consumers in these examples equates to the number of concurrent threads.
-In terms of data partitioning, a single consumer process with four threads is the same as
-four consumers running one thread each.
 
-Talking about a hundred partitions sounds a lot, but consider if we use two of the LSST:UK test bed machines
+Allocating hundreds of \kfpartitions sounds a lot, but consider if we use two of the LSST:UK test bed machines
 with 28 cpu cores each, with hyper-threading (https://en.wikipedia.org/wiki/Hyper-threading) enabled,
 that gives us a potential (28*2*2) = 112 concurrent threads.
 If we want to be able to dynamically add extra processing to the system in response to load, then
 adding a third machine would give us 168 threads, and a fourth machine would give us a total of 224
 concurrent threads.
 
-In order to be able to scale the system to this level, we would need to allocate enough partitions
+In order to be able to scale the system to this level, we would need to allocate enough \kfpartitions
 to be able to share the data across all 224 threads.
 
-However, there are costs associated with increasing the number of partitions.
-The primary cost of splitting the data across a large number of partitions is the amount of resources this consumes on the servers.
+However, there are costs associated with increasing the number of \kfpartitions.
+The primary cost of splitting the data across a large number of \kfpartitions is the amount of resources this consumes on the servers.
 
 If we consider the stage 1 top level FIFO buffer, there are likley to be several logical client processes
 receiving data from the same buffer topic.
@@ -1943,35 +1968,34 @@ We may have three or four processors consuming data from the stream and performi
 watch list triggers.
 We may have a couple of processors consuming data from the stream and extracting the thumbnail images or light curves, and we may have a couple of processors consuming data from the stream and archiving it as Avro or Parquet files for downstream analysis tools.
 
-The way that Kafka is able to handle multiple processes consuming data at different rates is by appending the data to flat log files, one for each partition, and maintaining a separate offset pointer for each consumer.
+The way that Kafka is able to handle multiple processes consuming data at different rates is by appending the data to flat log files, one for each \kfpartition, and maintaining a separate offset pointer for each consumer.
 
-When a group of consumers subscribe to a topic, the servers assigns the available partitions to the members of the group, storing an offset pointer for each consumer for each partiton it is allocated.
+When a group of consumers subscribe to a topic, the servers assigns the available \kfpartitions to the members of the group, storing an offset pointer for each consumer for each partiton it is allocated.
 
-When a consumer requests a block of data, the server loads the next available block from one of the partions allocated to that consumer using the offset pointer for that consumer on that partition.
+When a consumer requests a block of data, the server loads the next available block from one of the partions allocated to that consumer using the offset pointer for that consumer on that \kfpartition.
 The server loads the data into a buffer in memory, sends it to the consumer and waits for an acknowledgment.
-When it receives an acknowledgment from the consumer, the server increments the offset pointer for that consumer on that partition and then loads the next block of data to send
+When it receives an acknowledgment from the consumer, the server increments the offset pointer for that consumer on that \kfpartition and then loads the next block of data to send
 
 If we allocate separate consumer processes to each watch list, \crossmatch, filter or characterization process, then our stage 1 FIFO buffer may have a hundred processes subscribed to read data from the topic.
 
 Each of these logical processes consists of a group of concurrent consumer processes running on one or more of the worker nodes.
 
-Irrespective of how many concurrent threads they are running, each consumer group will need to allocate
-a consumer connection to each partition.
+Irrespective of how many concurrent threads they are running, each consumer group will need to allocate a consumer connection to each \kfpartition.
 
-A hundred consumer groups means a hundred connections to each partition.
+A hundred consumer groups means a hundred connections to each \kfpartition.
 
-If we distribute our data across 224 partitions, then our server machine has to handle 224 partitions, with 100 connections to each partition, each connection needing a buffer for the data, an offset counter and an open file descriptor to read the data.
+If we distribute our data across 224 \kfpartitions, then our server machine has to handle 224 \kfpartitions, with 100 connections to each \kfpartition, each connection needing a buffer for the data, an offset counter and an open file descriptor to read the data.
 
-The second cost of splitting the data across a large number of partitions is the amount of resources this consumes on the client.
-If we have 224 partitions and 224 consumer threads, then in theory each consumer should only need to handle data for one partition, or 1/224 of the data.
+The second cost of splitting the data across a large number of \kfpartitions is the amount of resources this consumes on the client.
+If we have 224 \kfpartitions and 224 consumer threads, then in theory each consumer should only need to handle data for one \kfpartition, or 1/224 of the data.
 
 However, the way that the connection process works means there is a race condition at the start of the process.
-The first consumer to subscribe to a topic is allocated all of the partitions for that topic.
-When the second consumer subscribes, half of the partitions are re-allocated to the new joiner.
-When the third consumer subscribes, a third of the partitions are re-allocated to the new joiner, and so on.
+The first consumer to subscribe to a topic is allocated all of the \kfpartitions for that topic.
+When the second consumer subscribes, half of the \kfpartitions are re-allocated to the new joiner.
+When the third consumer subscribes, a third of the \kfpartitions are re-allocated to the new joiner, and so on.
 
 The problem is that at the start of the process when there are only a few consumers subscribed to the topic,
-they have to share all of the partitions between them. Worst case is the short period when only one
+they have to share all of the \kfpartitions between them. Worst case is the short period when only one
 consumer is subscribed, it has to handle network connections and data buffers for all 244 topics.
 
 \subsection{Kafka  archive}
