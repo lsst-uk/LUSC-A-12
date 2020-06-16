@@ -13,7 +13,7 @@
 
 \title{LUSC-A-12 LSST:UK phase A alert handling infrastructure experiments}
 \author{D. Morris}
-\date{June 2020}
+%\date{June 2020}
 
 \setlength{\parskip}{1em}
 
@@ -1895,12 +1895,8 @@ With six \kfpartitions, then two of the have two \kfpartitions and two of the se
 \end{figure}
 
 As the number of \kfpartitions increases, the data is spread more evenly across the servers.
-
 With twenty five \kfpartitions, three of the four servers would have six
 \kfpartitions, and one of the servers would have seven \kfpartitions.
-
-With one hundred and twenty five \kfpartitions, three of the four servers would have thirty one \kfpartitions, and one of the servers would have thirty two \kfpartitions.
-
 The general rule is configuring a topic to have more \kfpartitions spreads the data more evenly across the available resources.
 
 The same process of distributing data between resources applies to \kfconsumers receiving data from the \kfbroker.
@@ -1909,7 +1905,7 @@ Starting with our first example, three \kfpartitions spread across four nodes. I
 
 \textbf{TODO} - diagram
 
-If we add a second consumer, then the three \kfpartitions are spread as evenly as possible between the two \kfconsumers. In this case, one \kfconsumer would receive data for two of the \kfpartitions and one \kfconsumer would receive data for the remaining \kfpartition.
+If we add a second consumer, then one \kfconsumer would receive data for two of the \kfpartitions and one \kfconsumer would receive data for the remaining \kfpartition.
 Note that \kafka will not share data from a \kfpartition between \kfconsumers, so it will not allocate one and a half \kfpartitions of data to each of the two \kfconsumers.
 
 If we have three consumers, then each consumer handles data from one \kfpartition.
@@ -1922,70 +1918,37 @@ Increasing the number of consumers beyond the number of \kfpartitions
 results in idle consumers with no data sent to them.
 
 This limits the level of concurrency that the downstream component can be configured with. With three \kfpartitions, then the system will only send data to three consumers.
-Adding more consumers running in parallel will not increase the data throughput.
+Adding more consumers running in parallel will not increase the throughput.
 
-With twenty five \kfpartitions, we can add up to twenty five consumers running in parallel, and each consumer will receive data from one \kfpartition.
-
-With one hundred and twenty five \kfpartitions, we can add up to hundred and twenty five consumers running in parallel.
-
-Allocating \kfpartitions to resources is a dynamic process. If we add more nodes to a live cluster, the cluster will automatically re-assign \kfpartitions to the new nodes, balancing the \kfpartitions and replicas between the available resources.
-
-Adding new nodes to a cluster will not increase the number of \kfpartitions for a \kftopic, it will just spread the existing \kfpartitions across the available nodes.
-
-Adding more \kfconsumers to a consumer group will automatically assign \kfpartitions to the new joiners, balancing the \kftopic \kfpartitions between the \kfconsumers.
-
-If we have twenty five \kfpartitions and ten \kfconsumers, then five of the \kfconsumers will receive data for three of the \kfpartitions, and five of the \kfconsumers will receive data for two of the \kfpartitions.
-
-\textbf{TODO} - diagram
-
-As we add more \kfconsumers to the group the \kfbroker will dynamically re-allocate \kfpartitions between the \kfconsumers.
-This works all the way up to twenty five \kfconsumers, each handling data from one \kfpartition.
-
-Again, adding a twenty sixth \kfconsumers will not spread the data from a \kfpartition between two \kfconsumers. So the twenty sixth \kfconsumers will not get any data.
-
-The general rule is splitting a \kftopic across more \kfpartitions in the \kfbroker means it can be spread across more \kfconsumers downstream.
-
-The number of \kfpartitions a \kftopic is assigned in the \kfbroker sets the upper limit on the number of concurrent \kfconsumers downstream.
+The general rule is splitting a \kftopic across more \kfpartitions in the \kfbroker means it can be spread across more \kfconsumers downstream, and the number of \kfpartitions a \kftopic is assigned in the \kfbroker sets the upper limit on the number of concurrent \kfconsumers downstream.
 
 Having more \kfconsumers than \kfpartitions will result in the extra \kfconsumers sitting idle with no data sent to them.
 
 Note that the number of \kfconsumers in these examples equates to the number of concurrent threads. In terms of partitioning a \kftopic, a single \kfconsumer process with four threads is the same as
 four \kfconsumer running one thread each.
 
-
 Allocating hundreds of \kfpartitions may sound a lot, but if we consider using just two of the LSST:UK test bed machines each with 28 processor cores, with hyper-threading\footurl{https://en.wikipedia.org/wiki/Hyper-threading} enabled that would give us a potential (28*2*2) = 112 concurrent threads.
 
-If we want to be able to dynamically add extra processing to the system in response to load, then adding a third machine would give us 168 threads, and a fourth machine would give us a total of 224 concurrent threads.
+If we wanted to be able to scale the system to spread the data processing across all 112 threads, we would need to allocate 112 \kfpartitions for the \kftopic in the \kfbroker.
 
-In order to be able to scale the system to this level, we would need to allocate enough \kfpartitions to be able to share the data across all 224 threads.
+In general, splitting \kftopics into more smaller \kfpartitions is a good thing.
+However, there are costs associated with increasing the number of \kfpartitions.
 
-However, there are costs associated with increasing the number of \kfpartitions. The primary cost of splitting the data across a large number of \kfpartitions is the amount of resources this consumes on the servers.
+The first and more obvious cost are the server side resources needed to maintain connections to all the \kfconsumers.
 
-If we consider the stage 1 top level FIFO buffer, there are likely to be several logical client processes receiving data from the same buffer topic.
-We may have three or four processors consuming data from the stream and performing catalog \crossmatch or watch list triggers.
-We may have a couple of processors consuming data from the stream and extracting the thumbnail images or light curves, and we may have a couple of processors consuming data from the stream and archiving it as \avro or \parquet files for analysis tools.
+A Kafka \kfbroker handles multiple processes consuming data at different rates by maintaining a separate offset pointer for each \kfconsumer within each \kfpartition.
 
-The way that Kafka is able to handle multiple processes consuming data at different rates is by maintaining a separate offset pointer for each \kfconsumer within each \kfpartition.
+When a group of \kfconsumers subscribe to a \kftopic, the \kfbroker assigns the available \kfpartitions to \kfconsumers and sets up an offset pointer in each \kfpartition to keep track of which messages have been sent to that \kfconsumer group.
+When a member of a \kfconsumer group requests the next block of messages the \kfbroker uses the offset pointer to load and send the next block of messages.
+When the \kfbroker receives an acknowledgment from the \kfconsumer, the \kfbroker marks those messages as received by moving the offset pointer to point to the next block of messages.
 
-When a group of \kfconsumers subscribe to a \kftopic, the \kfbroker assigns the available \kfpartitions to individual \kfconsumers, storing a separate offset pointer the \kfconsumer in each \kfpartition it is allocated.
-
-When the \kfconsumer requests a block of data for a \kfpartition from a \kfbroker node, the node uses the offset pointer for that \kfconsumer to load the next block of messages for that \kfconsumer.
-
-The server loads the data into a buffer in memory, sends it to the \kfconsumer and waits for an acknowledgment.
-When it receives an acknowledgment from the \kfconsumer, the node increments the offset pointer for that \kfconsumer on that \kfpartition and then loads the next block of data to send.
-
-If we want to run all our watch lists, \crossmatch processors and alert filters as separate processes, then then our stage 1 FIFO buffer will multiple \kfconsumer groups subscribed to the main \kftopic.
-
-Each of these \kfconsumer groups will need to have a \kfconsumer instance assigned to each \kfpartition in the main \kftopic.
-
-If we partition the main \kftopic across 224 \kfpartitions, then 
-to maximise the processing concurrency each \kfconsumer group would contain 224 individual \kfconsumer processes.
-Each \kfconsumer process would need an offset counter and open file descriptor allocated on the \kfbroker node to read the data for that \kfconsumer.
+If our main \kftopic has 112 \kfpartitions, then to maximise the processing concurrency each \kfconsumer group would need to contain 112 \kfconsumer processes.
+To support this the \kfbroker would need to maintain a corresponding offset counter and an open file descriptor for each \kfconsumer group for each \kfpartition.
 
 In order to handle this number of open file descriptors the deployment notes for \kafka recommend increasing the number of available file descriptors from the default value of 1000 for a typical Linux server to over 100,000\footurl{https://docs.confluent.io/current/kafka/deployment.html#file-descriptors-and-mmap}.
 
 The second cost of splitting the data across a large number of \kfpartitions is the amount of resources this consumes on the client.
-If we have 224 \kfpartitions and 224 consumer threads, then in theory each \kfconsumer should only need to handle data for one \kfpartition, or 1/224 of the data.
+If we have 122 \kfpartitions and 122 consumer threads, then in theory each \kfconsumer should only need to handle data for one \kfpartition, or 1/122 of the data.
 
 However, the way that the connection process works means there is a race condition at the start.
 The first \kfconsumer to subscribe to a topic is allocated all of the \kfpartitions for that topic.
@@ -1993,12 +1956,12 @@ When the second \kfconsumer subscribes, half of the \kfpartitions are re-allocat
 When the third \kfconsumer subscribes, a third of the \kfpartitions are re-allocated to the new joiner, and so on.
 
 The problem is that at the start of the process when there are only a few \kfconsumers subscribed to the \kftopic, they have to share all of the \kfpartitions between them.
-The worst case is the short period at the start when the first \kfconsumer subscribes and it has to the create enough network connections and data buffers for all 244 topics.
+The worst case is the short period at the start when the first \kfconsumer subscribes and it has to the create enough network connections and data buffers for all 122 \kfpartitions.
 
-If the first \kfconsumer fails due to an out of memory error, then the \kafka \kfbroker will automatically re-assign the \kfpartitions assigned to the failed \kfconsumer to other \kfconsumers. It is possible for this situation to cascade, overloading the second \kfconsumer, which fails, re-assigning all the \kfpartitions to the next \kfconsumer, which fails.
+If the first \kfconsumer fails due to an out of memory error, then the \kafka \kfbroker will automatically re-assign the \kfpartitions assigned to the failed \kfconsumer to other \kfconsumers. It is possible for this situation to cascade, overloading the second \kfconsumer, which fails, re-assigning all the \kfpartitions to the third \kfconsumer, which fails, and so on.
 
-In order to cause this cascade of errors we deliberately configured our \kfconsumer clients with a tiny amount of resources, much less than would normally be allocated to a virtual machine.
-However, as with the other edge cases described above, it is worth system administrators trying this experiment to see what this situation looks like in the \kfbroker error logs and learn how to recognise it and recover from it on a production system.
+In order to cause this cascade of errors we had to deliberately configure our \kfconsumer clients with a tiny amount of resources, much less than would normally be allocated to a virtual machine.
+However, as with the other edge cases described above, it is worth system administrators trying this experiment to recognise the symptoms in the \kfbroker error logs and how to recover from this situation on a production system.
 
 \printbibliography
 
