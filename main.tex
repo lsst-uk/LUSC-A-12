@@ -249,6 +249,11 @@
 
 \maketitle
 
+%Push text to the bottom of the page.
+%https://tex.stackexchange.com/a/300368
+\vspace*{\fill}
+This work has been supported by STFC funding for UK participation in LSST, through grant ST/N002512/1.
+
 %TODO Citeable DOI GitHub repositories.
 %https://academia.stackexchange.com/a/20999
 %https://github.blog/2014-05-14-improving-github-for-science/
@@ -459,7 +464,7 @@ Using the different systems helped us to learn how to manage service deployments
 \subsection{\eleanor \openstack}
 \label{deployment-eleanor.openstack}
 
-The first set of \kafka deployments for the \phasea  experiments were deployed on the \eleanor\footurl{https://www.ed.ac.uk/information-services/computing/computing-infrastructure/cloud-computing-service/researcher-cloud-service-eleanor}  \openstack platform provided by \uedin IT services.
+The first set of \kafka deployments for the \phasea  experiments were deployed on the \eleanor\footurl{https://www.ed.ac.uk/information-services/computing/computing-infrastructure/cloud-computing-service/researcher-cloud-service-eleanor} \openstack platform provided by \uedin IT services.
 
 To support this deployment we developed a set of shell script tools for managing virtual machines on the \eleanor \openstack system. 
 The tools were packaged in a \docker container that included the \openstack command line client along with a set of shell scripts that helped to manage virtual machines and some parser utilities that make it easier to handle the \eleanor-specific syntax for things like virtual machine falvours and the internal and external network addresses.
@@ -1812,8 +1817,6 @@ In this case, this service was deliberately configured this way to learn what wo
 The \kafka user guide explicitly advises system administrators not to share disc spindles between \kafka nodes for this reason.
 
 Based on our experience with administering a \kafka \kfbroker it is worth experimenting with different "what if" scenarios like this to learn how \kafka behaves when things go wrong and how to manage them when they do.
-
-\clearpage
 
 \subsection{Kafka partitions}
 \label{kafka-partitions}
