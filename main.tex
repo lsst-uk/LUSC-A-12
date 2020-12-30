@@ -21,7 +21,9 @@
 %\bibliographystyle{abbrvnat}
 %\setcitestyle{authoryear,open={((},close={))}}
 
-\usepackage{breakurl}
+% burl doesn't work in pdflatex
+% https://tex.stackexchange.com/a/212921
+%\usepackage{breakurl}
 
 \usepackage[style=numeric]{biblatex}
 \addbibresource{references.bib}
@@ -167,7 +169,7 @@
 
 \newcommand{\hdisk} {disk\xspace}
 
-\newcommand{\footurl}[1] {\footnote{\burl{#1}}}
+\newcommand{\footurl}[1] {\footnote{\url{#1}}}
 
 \usepackage{color}
 \usepackage{listings}
@@ -679,28 +681,32 @@ The data generator adds successively larger and larger sets of points in a squar
 So after \textit{n} iterations the test data contains \(((2^n)+1)^2\) points.
 
 Given an initial point at the \centre, the first pass of the algorithm will add eight additional points to create a 3x3 grid of points around the target. 
-\begin{figure}[h]
+\begin{figure}[hbt!]
+\centering
 \includesvg{images/data-count-01.svg}
 \caption{$n=1 \ :\ ((2^n)+1)^2 = 3^2 = 9 \ points, 1 \ match$}
 \label{fig:data-count-01}
 \end{figure}
 
 The second pass will add an additional 16 points in between the original nine, to create a 5x5 grid of 25 points around the target. 
-\begin{figure}[h]
+\begin{figure}[hbt!]
+\centering
 \includesvg{images/data-count-02.svg}
 \caption{$n=2 \ :\ ((2^n)+1)^2 = 5^2 = 25 \ points, 9 \ matches$}
 \label{fig:data-count-02}
 \end{figure}
 
 The third pass will add a further 56 points to create a 9x9 grid of 81 points around the target. 
-\begin{figure}[h]
+\begin{figure}[hbt!]
+\centering
 \includesvg{images/data-count-03.svg}
 \caption{$n=3 \ :\ ((2^n)+1)^2 = 9^2 = 81 \ points, 29 \ matches$}
 \label{fig:data-count-03}
 \end{figure}
 
 The fourth pass adds another 208 points to create a 17x17 grid of 289 points around the target.
-\begin{figure}[h]
+\begin{figure}[hbt!]
+\centering
 \includesvg{images/data-count-04.svg}
 \caption{$n=4 \ :\ ((2^n)+1)^2 = 17^2 = 289 \ points, 113 \ matches$}
 \label{fig:data-count-04}
@@ -788,7 +794,7 @@ The third scheme created a complex index of zone id, right ascension and declina
 
 The database tests showed that for this particular complex query, the combined and complex indexes performed better than the separate single value indexes.
 
-\begin{table}[h]
+\begin{table}[hbt!]
 \centering
 \begin{tabular}{|l|l|l|}
 \hline
@@ -834,7 +840,7 @@ and an indexed collection of positions within each zone:
 
 These tests showed a significant advantage to the native Java implementation, which out performed the \hsqldb database implementation by a factor of 10.
 
-\begin{table}[h]
+\begin{table}[hbt!]
 \centering
 \begin{tabular}{|l|l|l|}
 \hline
@@ -899,7 +905,7 @@ The third scheme created a combined \texttt{CompoundIndex} on right ascension an
 
 These tests showed a significant advantage for the separate simple indexes for this particular use case:
 
-\begin{table}[h]
+\begin{table}[hbt!]
 \centering
 \begin{tabular}{|l|l|l|}
 \hline
@@ -923,7 +929,7 @@ The \cqengine implementation performed the three stages of the zone algorithm, s
 
 The final set of tests looked at the relationship between the size of the zones, search radius and performance. Due to limited time we were unable to develop a detailed model of the relationship. However we were able to confirm the general rule described in Gray et al, that the algorithm produced the best results when the zone height was close to or equal to the search radius. 
 
-\begin{table}[h]
+\begin{table}[hbt!]
 \centering
 \begin{tabular}{|l|l|l|l|}
 \hline
@@ -1636,7 +1642,7 @@ If the upstream message \kfproducer introduces a new type of message, one that i
 
 The format starts with a single byte to represent the serialization format version (zero in the current version) followed by four bytes for the \avschema identifier and then the rest of the message body.
 
-\begin{table}[h]
+\begin{table}[hbt!]
 \begin{tabulary}{\linewidth}{|L|L|L|}
 \hline
 \textit{Byte} & \textit{Field} & \textit{Description} \\
@@ -1716,13 +1722,12 @@ A \kafka server stores data for a topic as a set of log files which are split in
 
 The number of \kfpartitions is set by the client when the topic is created and the \javaname{Producer} class from the client library is responsible for distributing the data across the \kfpartitions.
 
-\begin{figure}[H]
-\begin{center}
+\begin{figure}[hbt!]
+\centering
 \includegraphics{images/kafka-partitions-01.png}
 %\includesvg{images/kafka-partitions-01.svg}
 \caption{Client \javaname{Producer} distributes messages to \kfpartitions}
 \label{fig:kafka-partitions-01}
-\end{center}
 \end{figure}
 
 The total number of log files is set by the number of \kfpartitions multiplied by the replication factor set for that topic.
@@ -1731,13 +1736,12 @@ If this topic is served by four servers, then each server will be allocated thre
 
 The \javaname{Producer} client connector writes each \kfpartition to one server. Replicating the data to the other servers in the cluster is handled internally by server to server transfers.
 
-\begin{figure}[H]
-\begin{center}
+\begin{figure}[hbt!]
+\centering
 \includegraphics{images/kafka-partitions-03.png}
 %\includesvg{images/kafka-partitions-03.svg}
 \caption{Client \javaname{Producer} distributes messages to \kfpartitions}
 \label{fig:kafka-partitions-03}
-\end{center}
 \end{figure}
 
 If we lose one of the machines, server-s2 for example, the system still has two copies of each of the three \kfpartition files that were on server-s2.
@@ -1750,13 +1754,12 @@ If we lose one of the machines, server-s2 for example, the system still has two 
 
 If we replace server-2 with an empty machine, the three missing log files can be recovered using data from the other servers.
 
-\begin{figure}[H]
-\begin{center}
+\begin{figure}[hbt!]
+\centering
 \includegraphics{images/kafka-partitions-04.png}
 %\includesvg{images/kafka-partitions-04.svg}
 \caption{Missing data recovered from replicas}
 \label{fig:kafka-partitions-04}
-\end{center}
 \end{figure}
 
 Our experience of using \kafka on an unreliable cloud platform that is having issues with virtual machines losing contact and dropping off the network is that the \kafka replication system works well and enables system administrators to provide a reliable and fault tolerant \kfbroker service even when the underlying platform is not reliable.
@@ -1833,13 +1836,12 @@ If we simplify the distribution process to a round-robin selection, then the fir
 The fourth block of messages are not sent the fourth node because the \kftopic is configured to have only three \kfpartitions.
 Instead the fourth block is sent to \kfpartition 1 on the first node, the fifth to \kfpartition 2 on the second node and the sixth block to \kfpartition 3 on the third node.
 
-\begin{figure}[H]
-\begin{center}
+\begin{figure}[hbt!]
+\centering
 \includegraphics{images/kafka-partitions-05.png}
 %\includesvg{images/kafka-partitions-05.svg}
 %\caption{Client \javaname{Producer} distributes messages to partitions}
 \label{fig:kafka-partitions-05}
-\end{center}
 \end{figure}
 
 \textbf{TODO} - update the diagram to show \kfpartitions and nodes
@@ -1852,13 +1854,12 @@ If we increase the \kfpartition count to four, then the \kfpartitions are spread
 
 If the \kfproducer sends six blocks of data, they are spread as evenly as possible between the four \kfpartitions; \kfpartitions 1 and 2 will get two data blocks each and \kfpartitions 3 and 4 will get just one data block.
 
-\begin{figure}[H]
-\begin{center}
+\begin{figure}[hbt!]
+\centering
 \includegraphics{images/kafka-partitions-06.png}
 %\includesvg{images/kafka-partitions-06.svg}
 %\caption{Client \javaname{Producer} distributes messages to partitions}
 \label{fig:kafka-partitions-06}
-\end{center}
 \end{figure}
 
 \textbf{TODO} - update the diagram to show \kfpartitions and nodes
@@ -1867,13 +1868,12 @@ With five \kfpartitions, then three of the four nodes would have one \kfpartitio
 
 With six \kfpartitions, then two of the have two \kfpartitions and two of the servers have one \kfpartition.
 
-\begin{figure}[H]
-\begin{center}
+\begin{figure}[hbt!]
+\centering
 \includegraphics{images/kafka-partitions-08.png}
 %\includesvg{images/kafka-partitions-08.svg}
 %\caption{Client \javaname{Producer} distributes messages to partitions}
 \label{fig:kafka-partitions-07}
-\end{center}
 \end{figure}
 
 As the number of \kfpartitions increases, the data is spread more evenly across the nodes.
