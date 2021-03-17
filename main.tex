@@ -352,7 +352,7 @@ Deploying a buffer at the input to our system give us direct control over the nu
 \label{stage-1.schema-mapping}
 The ZTF and LSST alert messages are encoded using the \apache\avro\footurl{https://avro.apache.org/} binary encoding format. 
 
-In addition to the binary message content, the current live stream from \ztf uses an inline \avschema to describe the messages. Every message carries a copy of its \avschema embedded in the message header \serzed as a plain text \json\footurl{https://www.json.org/} document.
+In addition to the binary message content, the current live stream from \ztf uses an inline \avschema to describe the messages. Every message carries a copy of its \avschema; embedded in the message header \serzed as a plain text \json\footurl{https://www.json.org/} document.
 This means the alert messages are self-describing, and provides some insulation from side effects of \avschema changes for clients.
 However, embedding the \avschema in every message adds a non-trivial overhead, particularly if the stream only contains a small number of well known message types.
 
@@ -396,7 +396,7 @@ Based on our experience of working with the tools and client libraries provided 
 \label{stage-2}
 The second stage of processing consists of a set of loosely coupled components that consume data from a \kfstream, apply a filter or processing step, and produce a new \kfstream of results.
 
-\kafka is designed to distribute messages to multiple clients reading messages from the same \kfstream at different speeds. This means we can have multiple different components subscribed to the output of the \stageone buffer processing the messages at different rates without interfering with each other.
+\kafka is designed to distribute messages to multiple clients reading messages from the same \kfstream at different speeds. This means we can have multiple different components subscribed to the output of the \stageone buffer all processing the messages at different rates without interfering with each other.
 
 A mixture of slow, low bandwidth, components gradually working through the alert messages can subscribe to the same \kfstream as high speed, high bandwidth, components processing the alert messages as fast as possible. The \kafka broker takes care of buffering the data so that all of the components get to see all of the messages in the right order.
 
@@ -513,7 +513,7 @@ to provision virtual machines on the worker nodes.
 
 The \ischnura tools provide a simple cookie-cutter tool for creating identical virtual machines as quickly as possible.
 When we started this project the \ischnura tools only supported basic \libvirt deployments with the user account and ssh keys hard coded into the virtual machine images.
-In order to make our virtual machine images as portable as possible across both the \openstack systems and the \ischnura based platform we modified the \ischnura tools to use the same \cloudinit\footurl{https://cloud-init.io/} process used by \openstack to configure user accounts and ssh keys in new virtual machines.
+In order to make our virtual machine images as portable as possible across both the \openstack systems and the \ischnura based platform we modified the \ischnura tools to use the same \cloudinit\footurl{https://cloud-init.io/} process that \openstack uses to configure user accounts and ssh keys in new virtual machines.
 
 This work involved modifying the \ischnura tools to write the details of the admin user account to a \cloudinit configuration file on the host system, wrap the directory containing the configuration file as an ISO9660\footurl{https://en.wikipedia.org/wiki/ISO_9660} image, and mount that as a CDROM device on the new virtual machine. During the boot process the \cloudinit software will check a number of different options for configuration information, including a standard location on the local network or local CDROM device. If it finds some \cloudinit configuration data it will use it to configure the virtual machine admin account, including setting the correct ssh \texttt{authorized\_keys} and \texttt{sudo} permissions.
 
@@ -537,17 +537,17 @@ The third iteration of network configuration for the \testplatform defined a vir
 \subsection{Dnsmasq service}
 \label{deployment-testbed.dnsmasq}
 
-Placing all of the virtual machines on the same \vlan as their physical hosts, with the \libvirt network configured as a direct connection to the bridge interface meant that we could no longer use the \dnsmasq service provided by the local \libvirt instance on each of the physical machines.
+Placing all of the virtual machines on the same \vlan as their physical hosts, with the \libvirt network configured as a direct connection to the bridge interface, meant that we could no longer use the \dnsmasq service provided by the local \libvirt instance on each of the physical machines.
 In order to provide the \dhcp\footurl{https://en.wikipedia.org/wiki/Dynamic_Host_Configuration_Protocol} and \dns\footurl{https://en.wikipedia.org/wiki/Domain_Name_System} services needed to manage the IP addresses and host names across the whole of the \vlan we developed the configuration files for a \dnsmasq service to run in a \docker container.
 
 The \docker container deployment uses a vanilla \dnsmasq \docker container published by Storytel\footurl{https://github.com/Storytel/dnsmasq}\footurl{https://hub.docker.com/r/storytel/dnsmasq/dockerfile} and adds the configuration files needed to define a set of MAC addresses, IP addresses and hostnames for the virtual machines.
 
 Although there is no technical requirement to allocate these addresses on a per host basis, we used a template pattern to map specific groups of addresses to the virtual machines running on each physical host.
-This means it is possible to identify which physical machine a virtual machine is running on by looking at the MAC or IP address, which can be extremely useful when trying to debug network issues using data from capture logs of network traffic.
+This means it is possible to identify which physical machine a virtual machine is running on by looking at the MAC or IP address. This can be extremely useful when trying to debug network issues using data from capture logs of network traffic.
 
 The \dnsmasq \docker container was originally deployed on one of the \testplatform worker nodes, but it has since been moved to a separate physical machine allocated specifically for this purpose.
 Deploying the \dnsmasq service in a \docker container made this transition much easier, and paid back the original investment in time used to set up the \docker deployment.
-Moving the \dnsmasq service moved off of the worker node removed the requirement for a specific network configuration on that node, allowing all of the \testplatform worker nodes to be configured the same way with no unique configuration or services on any of them.
+Moving the \dnsmasq service off of the worker node removed the requirement for a specific network configuration on that node, allowing all of the \testplatform worker nodes to be configured the same way with no unique configuration or services on any of them.
  
 Source code and notes for the network configuration are published in the \esperia \github project\footurl{https://github.com/wfau/esperia}.
 
@@ -934,16 +934,10 @@ This part of the experiment was intended to replicate the findings of Gray et al
 
 The full \benchmarking comparison between different algorithms and implementations came later as the project evolved. As a result it is likely that our results have been skewed by a systematic error in either our \crossmatch implementation or the generated data used to test them.
 
-It is important to note that where the original papers reported results based on matching real archive data whereas our results are
-based on generated test data.
-The next step would be to run these tests again using data from a real archive data and compare the results with the results from the generated test data.
+It is important to note that where the original papers reported results based on matching real archive data whereas our results are based on generated test data.
+The next step would be to run these tests again using data from a real science catalog and compare the results with the results from the generated test data.
 
 We hope to be able to return to these experiments in subsequent projects to improve the accuracy and confidence level of these results.
-
-
-
-
-
 
 \subsection{Zone indexing}
 \label{zone-indexing}
@@ -988,20 +982,54 @@ The third scheme created a complex index of zone id, right ascension and declina
     CREATE INDEX complexindex ON zones (zone, ra, dec)
 \end{lstlisting}
 
-The database tests showed that for this particular complex query, the combined and complex indexes performed better than the separate single value indexes.
+The results of the tests show a progression based on the zone height. The data in table 31 shows that for a relatively large zone height of 0.5 there is a clear advantage to both the COMBINED and COMPLEX indexing compared to the SEPARATE index.
 
 \begin{table}[hbt!]
 \centering
-\begin{tabular}{|l|l|l|}
+\begin{tabular}{|l|l|l|l|}
 \hline
-\textit{Index type} & \textit{Data size} & \textit{Search time (ms)} \\ \hline
-Separate & 2,563,201 & 83 \\ \hline
-Combined [ra,dec] & 2,563,201 & 50 \\ \hline
-Complex  [zone,ra,dec] & 2,563,201 & 38 \\ \hline
+\textit{indexing} & \textit{radius (deg)} & \textit{found} & \textit{timeavg (ms)} \\ \hline
+SEPARATE & 0.5 & 50 & 39.47 \\ \hline
+SEPARATE & 0.125 & 4 & 20.872 \\ \hline
+SEPARATE & 0.03125 & 1 & 21.042 \\ \hline
+SEPARATE & 0.0078125 & 1 & 20.545 \\ \hline
+COMBINED & 0.5 & 53 & 22.384 \\ \hline
+COMBINED & 0.125 & 2 & 14.241 \\ \hline
+COMBINED & 0.03125 & 1 & 12.311 \\ \hline
+COMBINED & 0.0078125 & 1 & 12.566 \\ \hline
+COMPLEX  & 0.5 & 51 & 22.334 \\ \hline
+COMPLEX  & 0.125 & 2 & 14.496 \\ \hline
+COMPLEX  & 0.03125 & 1 & 13.288 \\ \hline
+COMPLEX  & 0.0078125 & 1 & 12.11 \\ \hline
 \end{tabular}
 \end{table}
 
-\textbf{TODO} - update results table with new data
+However, this advantage gradually becomes less significant as the zone size reduces to the point where the data in table 34 shows that for a zone height of 0.0078125 there is no difference between the three indexing schemes.
+
+\begin{table}[hbt!]
+\centering
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textit{indexing} & \textit{radius (deg)} & \textit{found} & \textit{timeavg (ms)} \\ \hline
+\multicolumn{4}{|c|}{....} \\ \hline
+\multicolumn{4}{|c|}{....} \\ \hline
+SEPARATE & 0.5 & 49 & 13.861 \\ \hline
+SEPARATE & 0.125 & 2 & 3.681 \\ \hline
+SEPARATE & 0.03125 & 1 & 1.221 \\ \hline
+SEPARATE & 0.0078125 & 1 & 0.424 \\ \hline
+COMBINED & 0.5 & 51 & 14.322 \\ \hline
+COMBINED & 0.125 & 3 & 3.143 \\ \hline
+COMBINED & 0.03125 & 1 & 1.014 \\ \hline
+COMBINED & 0.0078125 & 1 & 0.337 \\ \hline
+COMPLEX & 0.5 & 50 & 15.574 \\ \hline
+COMPLEX & 0.125 & 3 & 3.335 \\ \hline
+COMPLEX & 0.03125 & 1 & 1.093 \\ \hline
+COMPLEX & 0.0078125 & 1 & 0.424 \\ \hline
+\end{tabular}
+\end{table}
+
+This makes sense if we consider the effect of zone height on the number of zones and the count of points within each zone.
+As the zone height gets smaller, the data is split across many more zones, which means the index on zoneid is becomes more significant. At the same time, as the zones get smaller, the number of points within each zone get smaller, reducing the significance of the ra and dec indexes within each zone.
 
 \subsection{CQEngine implementation}
 \label{cqengine-implementation}
@@ -1034,126 +1062,57 @@ and an indexed collection of positions within each zone:
         }
 \end{lstlisting}
 
-These tests showed a significant advantage to the native Java implementation, which out performed the \hsqldb database implementation by a factor of 10.
-
-\begin{table}[hbt!]
-\centering
-\begin{tabular}{|l|l|l|}
-\hline
-\textit{Database} & \textit{Data size} & \textit{Search time (ms)} \\ \hline
-In-memory \hsqldb & 2,563,201 & 38 \\ \hline
-In-memory \cqengine & 2,563,201 & 3 \\ \hline
-\end{tabular}
-\end{table}
-
-\textbf{TODO} - update results table with new data
-
-\subsection{Collection indexing}
+\subsection{Matcher comparison}
 \label{cqengine-indexing}
 
-The next set of tests looked at different ways of indexing the data in the \cqengine Collections.
-
-The tests looked at three different indexing schemes for the Collection of positions. The first scheme simply created separate indexes on right ascension and declination.
-
-\begin{lstlisting}[style=Java]
-    positions.addIndex(
-        NavigableIndex.onAttribute(
-            ZoneMatcherImpl.POS_RA
-            )
-        );
-
-    positions.addIndex(
-        NavigableIndex.onAttribute(
-            ZoneMatcherImpl.POS_DEC
-            )
-        );
-\end{lstlisting}
-
-The second scheme created separate indexes, using a quantized index on right ascension.
-
-\begin{lstlisting}[style=Java]
-    positions.addIndex(
-        NavigableIndex.withQuantizerOnAttribute(
-            DoubleQuantizer.withCompressionFactor(
-                5
-                ),
-            ZoneMatcherImpl.POS_RA
-            )
-        );
-
-    positions.addIndex(
-        NavigableIndex.onAttribute(
-            ZoneMatcherImpl.POS_DEC
-            )
-        );
-\end{lstlisting}
-
-The third scheme created a combined \texttt{CompoundIndex} on right ascension and declination together.
-
-\begin{lstlisting}[style=Java]
-    positions.addIndex(
-        CompoundIndex.onAttributes(
-            ZoneMatcherImpl.POS_RA,
-            ZoneMatcherImpl.POS_DEC
-            )
-        );
-\end{lstlisting}
-
-These tests showed a significant advantage for the separate simple indexes for this particular use case:
+The test results in table 35 show a comparison between the different \texttt{Matcher} implementations.
 
 \begin{table}[hbt!]
 \centering
-\begin{tabular}{|l|l|l|}
+\begin{tabular}{|l|l|l|l|l|l|}
 \hline
-\textit{Index type} & \textit{Data size} & \textit{Search time (ms)} \\ \hline
-Combined indexes & 12,587,009 & 42 \\ \hline
-Quantized ra index & 12,587,009 & 21 \\ \hline
-Separate indexes & 12,587,009 & 0.45 \\ \hline
+\textit{matcher} & \textit{index} & \textit{zone} & \textit{radius} & \textit{found} & \textit{timeavg (ms)} \\ \hline
+HsqlHtmidMatcher & HTMID     & 0.5       & 0.5       & 48 &  7.127 \\ \hline
+HsqlHtmidMatcher & HTMID     & 0.25      & 0.25      &  9 &  2.234 \\ \hline
+HsqlHtmidMatcher & HTMID     & 0.125     & 0.125     &  3 &  0.541 \\ \hline
+HsqlHtmidMatcher & HTMID     & 0.0625    & 0.0625    &  1 &  0.26 \\ \hline
+HsqlHtmidMatcher & HTMID     & 0.03125   & 0.03125   &  1 &  0.146 \\ \hline
+HsqlHtmidMatcher & HTMID     & 0.015625  & 0.015625  &  1 &  0.073 \\ \hline
+HsqlHtmidMatcher & HTMID     & 0.0078125 & 0.0078125 &  1 &  0.053 \\ \hline
+HsqlZoneMatcher  & COMPLEX   & 0.5       & 0.5       & 51 & 22.334 \\ \hline
+HsqlZoneMatcher  & COMPLEX   & 0.25      & 0.25      & 11 &  8.902 \\ \hline
+HsqlZoneMatcher  & COMPLEX   & 0.125     & 0.125     &  3 &  5.413 \\ \hline
+HsqlZoneMatcher	 & COMPLEX   & 0.0625    & 0.0625    &  1 &  2.444 \\ \hline
+HsqlZoneMatcher	 & COMPLEX   & 0.03125   & 0.03125   &  1 &  1.115 \\ \hline
+HsqlZoneMatcher	 & COMPLEX   & 0.015625  & 0.015625  &  1 &  0.67 \\ \hline
+HsqlZoneMatcher	 & COMPLEX   & 0.0078125 & 0.0078125 &  1 &  0.424 \\ \hline
+CQZoneMatcher	 & SEPARATE  & 0.5       & 0.5       & 53 &  5.565 \\ \hline
+CQZoneMatcher	 & SEPARATE  & 0.25      & 0.25      & 11 &  0.915 \\ \hline
+CQZoneMatcher	 & SEPARATE  & 0.125     & 0.125     &  2 &  0.637 \\ \hline
+CQZoneMatcher	 & SEPARATE  & 0.0625    & 0.0625    &  1 &  0.424 \\ \hline
+CQZoneMatcher	 & SEPARATE  & 0.03125   & 0.03125   &  1 &  0.638 \\ \hline
+CQZoneMatcher	 & SEPARATE  & 0.015625  & 0.015625  &  1 &  1.106 \\ \hline
+CQZoneMatcher	 & SEPARATE  & 0.0078125 & 0.0078125 &  1 &  1.826 \\ \hline
 \end{tabular}
 \end{table}
 
-\textbf{TODO} - update results table with new data
+These results show that the \texttt{HsqlHtmidMatcher} and \texttt{CQZoneMatcher} implementations 
+perform at a similar speed when compared to the \texttt{HsqlZoneMatcher} implementation which is significantly slower.
 
-The results of the indexing tests match the way that the algorithm was implemented in the database version and the native Java version.
-
-The \hsqldb database implementation used a single SQL query to perform all three stages of the zone algorithm, selecting the zone, selecting positions within the zone based on \textit{ra} and \textit{dec} and then performing the final distance calculation all in one database query. It therefore makes sense that the combined and complex indexes performed better than the separate single value indexes for this case.
-
-The \cqengine implementation performed the three stages of the zone algorithm, selecting the zone, selecting positions within the zone and then performing the final distance calculation as separate steps in the Java program.  It therefore makes sense that using three separate indexes gave the best performance for this implementation.
-
-\subsection{Zone height}
-\label{zone-height}
-
-The final set of tests looked at the relationship between the size of the zones, search radius and performance. Due to limited time we were unable to develop a detailed model of the relationship. However we were able to confirm the general rule described in Gray et al, that the algorithm produced the best results when the zone height was close to or equal to the search radius. 
-
-\begin{table}[hbt!]
-\centering
-\begin{tabular}{|l|l|l|l|}
-\hline
-\textit{Data size} & \textit{Zone height} & \textit{Search radius} & \textit{Search time (ms)} \\ \hline
-12,587,009 & 0.25       & 0.015625 & 1.665 \\ \hline
-12,587,009 & 0.125      & 0.015625 & 2.312 \\ \hline
-12,587,009 & 0.0625     & 0.015625 & 0.669 \\ \hline
-12,587,009 & 0.03125    & 0.015625 & 0.528 \\ \hline
-12,587,009 & 0.015625   & 0.015625 & 0.419 \\ \hline
-12,587,009 & 0.0078125  & 0.015625 & 0.450 \\ \hline
-12,587,009 & 0.00390625 & 0.015625 & 0.607 \\ \hline
-\end{tabular}
-\end{table}
-
-\textbf{TODO} - update results table with new data
+The significant difference between the performance of the \texttt{HsqlHtmidMatcher} and \texttt{HsqlZoneMatcher} implementations, when both are being run on the same database platform with the same data, suggests there may be a problem with the way that the \texttt{HsqlZoneMatcher} database is configured.
 
 \subsection{Summary of results}
 \label{crossmatch-summary}
 
 Based on the test results, this set of experiments have been able to demonstrate a \crossmatch algorithm that is capable of meeting the target data rate of 1,000 alerts per second for \catalog sizes of the order of 67 million sources. 
-There is more that could be done to develop these experiments further, extending the size of the test \dataset, optimizing the indexing and exploring the relationship between zone size, search radius and search performance.
+There is more that could be done to develop these experiments further, extending the size of the test \dataset, developing a set of tests using real world science data, optimizing the database indexing and exploring the relationship between zone size, search radius and search performance.
 
 There is also more work to do to explore ways to make the system scalable and fault tolerance by distributing the \crossmatch searches over multiple machines.
 
-\section{Component libraries}
-\label{component-libraries}
+\section{Stream processing components}
+\label{stream-processing-components}
 
-This section describes some components that could be used to implement the second stage of the architecture design. Providing a framework to support loosely coupled components that consume data from a stream, apply a filter or processing step, and produce a new stream of results.
+The following section describes some components that could be used to implement the second stage of the architecture design. Providing a framework to support loosely coupled components that consume data from a stream, apply a filter or processing step, and produce a new stream of results.
 
 \subsection{Java interfaces}
 \label{component-libraries.java-interfaces}
@@ -1227,7 +1186,7 @@ The framework also provides a template implementation of a component that can co
 
 Extend this further, adding a list of \javaname{Processor} instances and a \texttt{for} loop to iterate through the list, we can define a \javaname{Component} that applies a sequence of \javaplural{Processor} to an input stream of \javaplural{Candidate}.
 
-\begin{lstlisting}[style=Java]
+break\begin{lstlisting}[style=Java]
     /**
      * A component template that includes methods for connecting
      * and subscribing to Kafka streams, reading messages and
@@ -1264,7 +1223,7 @@ Extend this further, adding a list of \javaname{Processor} instances and a \text
 
                 if (DONE == response)
                     {
-                    continue;
+                    break;
                     }
                 }
             }
@@ -1552,60 +1511,11 @@ We can extend the \javaname{Candidate} class, adding a list of \crossmatch match
 
 We can use this to build a component that combines a \javaname{CatalogMatcher} that matches the candidates against a \catalog and a \javaname{KafkaProducer} that sends the results to a new \kftopic.
 
-\textbf{TODO} - [[diagram]]
-
-\begin{itemize}
-    \item A \javaname{CrossmatchComponent} that generates a \kfstream of \crossmatch annotated candidates:
-    \begin{itemize}
-        \item \javaname{CatalogMatcher} matches against a \catalog and adds annotations.
-    \end{itemize}
-    \begin{itemize}
-        \item \javaname{KafkaProducer} writes annotated candidates to a new \kftopic.
-    \end{itemize}
-\end{itemize}
-
 In most cases it does not make sense to \crossmatch candidates that have already been associated with known solar system objects, so we want to exclude the solar system objects from the \crossmatch processing.
 
 One way to achieve this would be to use separate \javaplural{Component} and connect them together using \kafka \kfstreams. Connecting the output from a \javaname{SolarSystemFilter} \javaname{Component} to the input of a \javaname{CrossmatchComponent}.
 
-\textbf{TODO} - [[diagram]]
-
-\begin{itemize}
-    \item A \javaname{Component} that generates a stream of candidates that are not associated with known solar system objects:
-    \begin{itemize}
-        \item \javaname{SolarSystemFilter} configured to exclude solar system objects.
-    \end{itemize}
-    \begin{itemize}
-        \item \javaname{KafkaProducer} outputs filtered alerts to a \kafka \kftopic.
-    \end{itemize}
-\end{itemize}
-
-\begin{itemize}
-    \item A \javaname{Component} that generates a stream of \crossmatch annotated candidates:
-    \begin{itemize}
-        \item \javaname{CatalogMatcher} matches against a \catalog and adds annotations.
-    \end{itemize}
-    \begin{itemize}
-        \item \javaname{KafkaProducer} writes annotated candidates to a \kafka \kftopic.
-    \end{itemize}
-\end{itemize}
-
 Alternatively, we could combine the \javaname{SolarSystemFilter} and \javaname{CatalogMatcher} in the same \javaname{Component}.
-
-\textbf{TODO} - [[diagram]]
-
-\begin{itemize}
-    \item A \javaname{Component} that generates a \kfstream of \crossmatch annotated candidates that are not associated with solar system objects:
-    \begin{itemize}
-        \item \javaname{SolarSystemFilter} configured to exclude solar system objects.
-    \end{itemize}
-    \begin{itemize}
-        \item \javaname{CatalogMatcher} that matches against a \catalog and adds annotations.
-    \end{itemize}
-    \begin{itemize}
-        \item \javaname{KafkaProducer} writes annotated candidates to a \kafka \kftopic.
-    \end{itemize}
-\end{itemize}
 
 In this example, the resource cost of the \javaname{SolarSystemFilter} is so low, the combined solution is probably the most practical. The resource cost of publishing the non- solar system alerts as a separate \kftopic and reading them back in to the \crossmatch processor out-weighs the minimal cost of including an additional copy of the \javaname{SolarSystemFilter}.
 
@@ -1651,8 +1561,6 @@ To help configure and manage this interconnected network we can treat the \kafka
 \end{lstlisting}
 
 This simple \yaml configuration would deploy a new \kafka \kfbroker service, consisting of four \kafka nodes along with the associated \zookeeper service and the monitoring and management services needed to administer them.
-
-\textbf{TODO} - [[diagram]]
 
 Treating a \kafka \kfbroker as just another component makes it easy to deploy it alongside the processing components. A single \yaml configuration file could describe a chain of \kafka \kfbrokers and processing nodes that work together to implement everything needed for a science use case.
 
@@ -1707,8 +1615,6 @@ In this scenario, \kafka is the service in the middle, the \kfbroker that provid
 The \kafka \kfbroker does not know where the messages come from, or what happens to them after they are delivered.
 The \kafka \kfbroker concentrates purely on listening for messages from the \kfproducers, storing them in a buffer and forwarding them on to \kfconsumers.
 
-\textbf{TODO} - diagram
-
 \subsection{Publish-subscribe pattern}
 \label{kafka-pubsub-pattern}
 
@@ -1719,8 +1625,6 @@ The publishing component of the publish-subscribe pattern is referred to as a \k
 In the publish-subscribe pattern, a \kfpublisher does not send the messages directly to their final destination. Instead the messages are tagged as belonging to a \kftopic and sent to the \kfbroker.
 Once a message has been sent to the \kfbroker the \kfproducer is no longer involved in the delivery.
 
-\textbf{TODO} - diagram
-
 The \kfpublisher does not need to know anything about the \kfsubscribers, how many there are, where they are or what they do with the messages.
 The \kfbroker is responsible for storing and forwarding the message to the correct destinations, leaving the \kfproducer free to work on producing the next message.
 
@@ -1729,12 +1633,8 @@ The subscribing component of the publish-subscribe pattern is referred to as a \
 A \kfsubscriber does not need to know anything about the \kfpublishers, it just receives messages from the \kfbroker. 
 The \kfsubscriber contacts the \kfbroker and asks to subscribe to a \kftopic. The \kfbroker will then pass on any messages it receives that have been tagged as belonging to that \kftopic.
 
-\textbf{TODO} - diagram
-
 The choice of which messages belong to which \kftopics is not made by the \kfbroker. The assignment of messages to \kftopics is made by the \kfpublisher when it sends message to the \kfbroker.
 The \kfbroker does not read, interpret or filter the messages. It just passes messages on to \kfsubscribers based on which \kftopics the messages were tagged with. 
-
-\textbf{TODO} - diagram
 
 \subsection{Producers and consumers}
 \label{kafka-producer-consumer}
@@ -1747,13 +1647,9 @@ In terms of what is in the program source code, a message \kfpublisher sends its
 This quirk of naming can cause some confusion when talking about \kfproducers and \kfconsumers.
 It is important to keep in mind that the class in the client library is not a \kfproducer, it does not produce messages, it is just a connector. The whole message generating component is the \kfproducer, which uses an instance of a connector \javaname{class} from the \kafka client library to send messages to the \kfbroker.
 
-\textbf{TODO} - diagram
-
 Similarly on the receiving side, a \kfsubscriber, or \kafka \kfconsumer, uses a connector class from the \kafka client library to receive messages from a \kafka broker.
 The class in the client library that reads messages from a broker is also called a \javaname{Consumer}. In terms of what is in the program source code, a message \kfsubscriber receives messages by calling the \javaname{read()} method on a \javaname{Consumer} object.
 Again it is important to keep in mind that the class in the client library is not a \kfconsumer, it is just a connector. The whole message handling component is the \kfconsumer, which uses an instance of a connector \javaname{class} from the \kafka client library to receive messages from a \kfbroker.
-
-\textbf{TODO} - diagram
 
 \subsection{Avro encoding}
 \label{avro-encoding}
@@ -1796,8 +1692,6 @@ Most implementations that use a shared static \avschema rely on an external, out
 
 The in-line method embeds the \avschema into the header for each message.
 Every message includes a full copy of the message \avschema, serialized as a plain text \json\footurl{https://www.json.org/} document.
-
-\textbf{TODO} - diagram
 
 This means that all the messages are self-describing. A client does not need to know about the message \avschema beforehand, it can use the embedded \avschema to \deserz a message into a generic structure on the fly.
 
