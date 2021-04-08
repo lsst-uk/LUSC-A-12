@@ -51,6 +51,7 @@
 \newcommand{\dnsmasq} {\texttt{dnsmasq}\xspace}
 \newcommand{\dns} {DNS\xspace}
 \newcommand{\dhcp} {DCHP\xspace}
+\newcommand{\ceph} {Ceph\xspace}
 \newcommand{\cephfs} {CephFS\xspace}
 
 \newcommand{\ischnura} {Ischnura\xspace}
@@ -1611,7 +1612,7 @@ This section reports on lessons learned from our experience of working with \kaf
 In this scenario, \kafka is the service in the middle, the \kfbroker that provides the message delivery system. The \kfproducer and \kfconsumer are clients, external and separate from the \kafka \kfbroker.
 
 The \kafka \kfbroker does not know where the messages come from, or what happens to them after they are delivered.
-The \kafka \kfbroker concentrates purely on listening for messages from the \kfproducers, storing them in a buffer and forwarding them on to \kfconsumers.
+The \kafka \kfbroker concentrates purely on listening for messages from \kfproducers, storing them in a buffer and forwarding them on to \kfconsumers.
 
 \subsection{Publish-subscribe pattern}
 \label{kafka-pubsub-pattern}
@@ -1808,15 +1809,15 @@ Using a gateway \kfbroker like this enables the \lsstuk project to maintain a lo
 
 A \kafka server stores data for a topic as a set of log files which are split into \kfpartitions and distributed across the servers in a cluster.
 
-The number of \kfpartitions is set by the client when the topic is created and the \javaname{Producer} class from the client library is responsible for distributing the data across the \kfpartitions.
+The number of \kfpartitions is set by the client when the topic is created and the \javaname{Producer} class from the client library is responsible for distributing the data across \kfpartitions.
 
-\begin{figure}[hbt!]
-\centering
-\includegraphics{images/kafka-partitions-01.png}
+%\begin{figure}[H]
+%\centering
+%\includegraphics{images/kafka-partitions-01.png}
 %\includesvg{images/kafka-partitions-01.svg}
-\caption{Client \javaname{Producer} distributes messages to \kfpartitions}
-\label{fig:kafka-partitions-01}
-\end{figure}
+%\caption{Client \javaname{Producer} distributes messages to %\kfpartitions}
+%\label{fig:kafka-partitions-01}
+%\end{figure}
 
 The total number of log files is set by the number of \kfpartitions multiplied by the replication factor set for that topic.
 If a topic has four \kfpartitions, and a replication factor of three, then the data will be spread across 12 log files.
@@ -1824,7 +1825,7 @@ If this topic is served by four servers, then each server will be allocated thre
 
 The \javaname{Producer} client connector writes each \kfpartition to one server. Replicating the data to the other servers in the cluster is handled internally by server to server transfers.
 
-\begin{figure}[hbt!]
+\begin{figure}[H]
 \centering
 \includegraphics{images/kafka-partitions-03.png}
 %\includesvg{images/kafka-partitions-03.svg}
@@ -1842,7 +1843,7 @@ If we lose one of the machines, server-s2 for example, the system still has two 
 
 If we replace server-2 with an empty machine, the three missing log files can be recovered using data from the other servers.
 
-\begin{figure}[hbt!]
+\begin{figure}[H]
 \centering
 \includegraphics{images/kafka-partitions-04.png}
 %\includesvg{images/kafka-partitions-04.svg}
@@ -1859,13 +1860,12 @@ However, we did encounter a couple of issues that system administrators should b
 
 If the \kafka system is deployed on an \openstack cloud platform, then a fairly common way to manage storage space for the \kafka nodes is to use the Cinder\footurl{https://docs.openstack.org/cinder/latest/} block storage service to provide virtual discs on each node.
 
-A fairly common way of implementing the Cinder block storage service for an \openstack deployment is to use a \cephfs\footurl{https://docs.ceph.com/docs/master/cephfs/} 
-service to aggregate storage space across the network to provide a distributed file system for Cinder to use\footurl{https://docs.openstack.org/cinder/pike/configuration/block-storage/drivers/ceph-rbd-volume-driver.html}.
+A fairly common way of implementing the Cinder block storage service for an \openstack deployment is to use a \ceph\footurl{https://docs.ceph.com/} service to aggregate storage space across the network to provide a distributed file system for Cinder to use\footurl{https://docs.openstack.org/cinder/pike/configuration/block-storage/drivers/ceph-rbd-volume-driver.html}.
 
-A \cephfs service may itself use data replication to improve the reliability of the distributed file system.
-As a result, the combination of default configurations may mean that the data is replicated twice. Once by \kafka itself and again by the underlying \cephfs service used by \openstack.
+The \ceph service may itself use data replication to improve the reliability of the distributed file system.
+As a result, the combination of default configurations may mean that the data is replicated twice. Once by \kafka itself and again by the underlying \ceph service used by \openstack.
 
-This is not always a problem, and in fact using RAID replication for the \cephfs distributed file system can improve the performance of the system.
+This is not always a problem, and in fact using RAID replication for the \ceph distributed file system can improve the performance of the system.
 
 In theory it is possible for \openstack users to control the level of replication that is used for Cinder volumes. However, exposing the volume type configuration options to end users is not necessarily available on all \openstack deployments.
 
@@ -1919,20 +1919,19 @@ The key issue that needs to be considered is the number of \kfpartitions for eac
 
 If the \kftopic is configured to have only three \kfpartitions, the \kfproducer will distribute the data to each of the three \kfpartitions in turn.
 
-If we simplify the distribution process to a round-robin selection, then the first block of messages will be sent to \kfpartition 1 on the first node, the second block is sent to \kfpartition 2 on the second node, and the third block is sent to \kfpartition 3 on the third node.
+The messages are sent to the servers in blocks. The number of messages in each block is determined by the size of the individual messages and the size of the transmit buffers configured on the client and servers.
+If we simplify the distribution process to a round-robin selection, then the first block of messages will be sent to \kfpartition 1 on the first server, the second block is sent to \kfpartition 2 on the second server, and the third block is sent to \kfpartition 3 on the third server.
 
-The fourth block of messages are not sent the fourth node because the \kftopic is configured to have only three \kfpartitions.
-Instead the fourth block is sent to \kfpartition 1 on the first node, the fifth to \kfpartition 2 on the second node and the sixth block to \kfpartition 3 on the third node.
+The fourth block of messages are not sent the fourth server because the \kftopic is configured to have only three \kfpartitions.
+Instead the fourth block is sent to \kfpartition 1 on the first server, the fifth to \kfpartition 2 on the second server, and so on.
 
-\begin{figure}[hbt!]
+\begin{figure}[H]
 \centering
 \includegraphics{images/kafka-partitions-05.png}
 %\includesvg{images/kafka-partitions-05.svg}
-%\caption{Client \javaname{Producer} distributes messages to partitions}
+\caption{5 blocks distributed over 3 partitions}
 \label{fig:kafka-partitions-05}
 \end{figure}
-
-\textbf{TODO} - update the diagram to show \kfpartitions and nodes
 
 In this configuration, with more nodes than \kfpartitions, the fourth node does not have any \kfpartitions allocated to it.
 In reality, the replication factor would normally be greater than one, so internal replication would spread copies of the data between the four nodes, and so the fourth node would get a share of the data.
@@ -1940,29 +1939,11 @@ However, to simplify this example we are only tracking the primary copies for ea
 
 If we increase the \kfpartition count to four, then the \kfpartitions are spread evenly across all four nodes.
 
-If the \kfproducer sends six blocks of data, they are spread as evenly as possible between the four \kfpartitions; \kfpartitions 1 and 2 will get two data blocks each and \kfpartitions 3 and 4 will get just one data block.
-
-\begin{figure}[hbt!]
-\centering
-\includegraphics{images/kafka-partitions-06.png}
-%\includesvg{images/kafka-partitions-06.svg}
-%\caption{Client \javaname{Producer} distributes messages to partitions}
-\label{fig:kafka-partitions-06}
-\end{figure}
-
-\textbf{TODO} - update the diagram to show \kfpartitions and nodes
+If the \kfproducer sends six blocks of messages they are spread as evenly as possible between the four \kfpartitions; \kfpartitions 1 and 2 will get two data blocks each and \kfpartitions 3 and 4 will get just one data block.
 
 With five \kfpartitions, then three of the four nodes would have one \kfpartition each, and one of the nodes would have two \kfpartitions.
 
 With six \kfpartitions, then two of the have two \kfpartitions and two of the servers have one \kfpartition.
-
-\begin{figure}[hbt!]
-\centering
-\includegraphics{images/kafka-partitions-08.png}
-%\includesvg{images/kafka-partitions-08.svg}
-%\caption{Client \javaname{Producer} distributes messages to partitions}
-\label{fig:kafka-partitions-07}
-\end{figure}
 
 As the number of \kfpartitions increases, the data is spread more evenly across the nodes.
 With 25 \kfpartitions, three of the four nodes would have six
@@ -1973,16 +1954,12 @@ The same process of distributing data between resources applies to \kfconsumers 
 
 Starting with our first example, three \kfpartitions spread across four nodes. If we have a single consumer, then data from all four \kfpartitions are sent to the same consumer.
 
-\textbf{TODO} - diagram
-
 If we add a second consumer, then one \kfconsumer would receive data for two of the \kfpartitions and one \kfconsumer would receive data for the remaining \kfpartition.
 Note that \kafka will not share data from a \kfpartition between \kfconsumers, so it will not allocate one and a half \kfpartitions of data to each of the two \kfconsumers.
 
-If we have three consumers, then each consumer handles data from one \kfpartition.
+If we have three consumers, then each consumer receives data from one \kfpartition.
 
 If we have four consumers, then three of the consumers each get data from a \kfpartition, and the fourth consumer does not receive any data.
-
-\textbf{TODO} - diagram
 
 Increasing the number of \kfconsumers beyond the number of \kfpartitions results in idle \kfconsumers with no data sent to them.
 
@@ -2029,7 +2006,7 @@ The worst case is the short period at the start when the first \kfconsumer subsc
 
 If the first \kfconsumer fails due to an out of memory error, then the \kafka \kfbroker will automatically re-assign the \kfpartitions assigned to the failed \kfconsumer to other \kfconsumers. It is possible for this situation to cascade, overloading the second \kfconsumer, which fails, re-assigning all the \kfpartitions to the third \kfconsumer, which fails, and so on.
 
-In order to cause this cascade of errors we had to deliberately configure our \kfconsumer clients with a tiny amount of resources, much less than would normally be allocated to a virtual machine.
+In order to cause this cascade of errors we had to deliberately configure our \kfconsumer clients with a tiny amount of resources, much less than normal.
 However, as with the other edge cases described above, it is worth system administrators trying this experiment to recognise the symptoms in the \kfbroker error logs and how to recover from this situation on a production system.
 
 \printbibliography
